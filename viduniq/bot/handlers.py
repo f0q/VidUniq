@@ -8,7 +8,7 @@ import os
 import shutil
 import time
 from dataclasses import replace
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -20,6 +20,7 @@ from ..core import ffmpeg as ff
 from ..core.constants import OVERLAY_EXTENSIONS, VALID_INPUT_EXTENSIONS
 from ..core.uniq import Strength
 from . import keyboards as kb
+from .access import AccessStore
 from .config import Config
 from .queue import ProcessingQueue, Task
 from .store import SPEED_CHOICES, ZOOM_CHOICES, PrefsStore
@@ -47,10 +48,11 @@ HELP = (
 class Ctx:
     """Общие зависимости хендлеров."""
 
-    def __init__(self, cfg: Config, store: PrefsStore, queue: ProcessingQueue):
+    def __init__(self, cfg: Config, store: PrefsStore, queue: ProcessingQueue, access: Optional[AccessStore] = None):
         self.cfg = cfg
         self.store = store
         self.queue = queue
+        self.access = access or AccessStore(cfg.access_path, cfg.allowed_users, cfg.admin_users)
         self.bot: Bot | None = None
         self._last_edit: dict[str, float] = {}
         self._last_text: dict[str, str] = {}
@@ -80,16 +82,17 @@ def build_router(ctx: Ctx) -> Router:
     async def access_mw(handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
                         event: TelegramObject, data: dict[str, Any]):
         user = data.get("event_from_user")
-        if user is None or not ctx.cfg.is_allowed(user.id):
-            if isinstance(event, Message):
-                await event.answer(
-                    f"⛔ Доступ закрыт.\nВаш ID: <code>{user.id if user else '?'}</code> — "
-                    "передайте его администратору бота."
-                )
-            elif isinstance(event, CallbackQuery):
-                await event.answer("Доступ закрыт", show_alert=True)
+        if user is None:
             return None
-        return await handler(event, data)
+        acc = ctx.access
+        if acc.is_allowed(user.id):
+            acc.touch(user.id, user.username or user.full_name)
+            return await handler(event, data)
+        # Чужой: отвечаем с ID только на самую первую попытку, дальше — полный игнор;
+        # после MAX_STRANGER_ATTEMPTS попыток — постоянная блокировка (даже не считаем).
+        if isinstance(event, Message) and acc.stranger_attempt(user.id):
+            await event.answer(f"⛔ Доступ закрыт.\nВаш ID: <code>{user.id}</code> — передайте его администратору бота.")
+        return None
 
     r.message.outer_middleware(access_mw)
     r.callback_query.outer_middleware(access_mw)
@@ -151,6 +154,83 @@ def build_router(ctx: Ctx) -> Router:
         for i, t in enumerate(pending, 1):
             mine = " (ваш)" if t.user_id == m.from_user.id else ""
             lines.append(f"{i}. ⏳ {html.escape(t.src_name)}{mine}")
+        await m.answer("\n".join(lines))
+
+    # ------------------------------------------------------------ админ (скрытые команды)
+    def _admin_only(m: Message) -> bool:
+        return ctx.access.is_admin(m.from_user.id)
+
+    def _parse_id(m: Message) -> Optional[int]:
+        parts = (m.text or "").split()
+        if len(parts) >= 2 and parts[1].lstrip("-").isdigit():
+            return int(parts[1])
+        return None
+
+    @r.message(Command("adduser"))
+    async def cmd_adduser(m: Message):
+        if not _admin_only(m):
+            return
+        uid = _parse_id(m)
+        if uid is None:
+            await m.answer("Использование: <code>/adduser 123456789</code>")
+            return
+        added = ctx.access.add(uid)
+        await m.answer(f"✅ <code>{uid}</code> добавлен." if added else f"<code>{uid}</code> уже был в списке.")
+
+    @r.message(Command("deluser"))
+    async def cmd_deluser(m: Message):
+        if not _admin_only(m):
+            return
+        uid = _parse_id(m)
+        if uid is None:
+            await m.answer("Использование: <code>/deluser 123456789</code>")
+            return
+        if ctx.access.is_admin(uid):
+            await m.answer("Администратора убрать нельзя (ADMIN_USERS в .env).")
+            return
+        ctx.queue.cancel_user(uid)
+        removed = ctx.access.remove(uid)
+        await m.answer(f"🚫 <code>{uid}</code> удалён." if removed else f"<code>{uid}</code> не было в списке.")
+
+    @r.message(Command("blockuser"))
+    async def cmd_blockuser(m: Message):
+        if not _admin_only(m):
+            return
+        uid = _parse_id(m)
+        if uid is None or ctx.access.is_admin(uid):
+            await m.answer("Использование: <code>/blockuser 123456789</code>")
+            return
+        ctx.queue.cancel_user(uid)
+        ctx.access.block(uid)
+        await m.answer(f"⛔ <code>{uid}</code> заблокирован навсегда (снять: /adduser).")
+
+    @r.message(Command("listusers"))
+    async def cmd_listusers(m: Message):
+        if not _admin_only(m):
+            return
+        snap = ctx.access.snapshot()
+        now = time.time()
+
+        def ago(ts: float) -> str:
+            if not ts:
+                return "не заходил"
+            d = int(now - ts)
+            if d < 3600:
+                return f"{d // 60} мин назад"
+            if d < 86400:
+                return f"{d // 3600} ч назад"
+            return f"{d // 86400} дн назад"
+
+        lines = ["👑 Админы: " + ", ".join(f"<code>{u}</code>" for u in snap["admins"]), "", "✅ Разрешены:"]
+        for uid, st in snap["allowed"]:
+            name = f" @{html.escape(st.name)}" if st.name and not st.name.startswith("@") and " " not in st.name else (f" {html.escape(st.name)}" if st.name else "")
+            lines.append(f"• <code>{uid}</code>{name} — {ago(st.last_seen)}, файлов: {st.files}")
+        if not snap["allowed"]:
+            lines.append("• (пусто)")
+        if snap["blocked"]:
+            lines += ["", "⛔ Заблокированы: " + ", ".join(f"<code>{u}</code>" for u in snap["blocked"])]
+        if snap["strangers"]:
+            lines += ["", "👀 Стучались: " + ", ".join(f"<code>{u}</code> ×{n}" for u, n in snap["strangers"].items())]
         await m.answer("\n".join(lines))
 
     # ------------------------------------------------------------ медиа
@@ -400,6 +480,7 @@ def build_router(ctx: Ctx) -> Router:
                 log.exception("send_video failed")
                 await bot.send_message(task.chat_id, f"❌ Не удалось отправить {html.escape(fname)}: {html.escape(str(e))[:300]}")
         elapsed = time.time() - task.started_at
+        ctx.access.touch(task.user_id, files=1)
         await _edit_status(task, f"✅ <b>{name}</b>\nГотово: {sent} из {len(task.outputs)} · {elapsed:.0f} с", None, force=True)
 
     async def _edit_status(task: Task, text: str, markup, force: bool = False):

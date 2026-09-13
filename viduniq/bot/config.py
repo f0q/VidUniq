@@ -64,8 +64,8 @@ class Config:
         errors = []
         if not self.bot_token or ":" not in self.bot_token:
             errors.append("BOT_TOKEN не задан (получите у @BotFather)")
-        if not self.allowed_users:
-            errors.append("ALLOWED_USERS пуст — бот никого не пустит. Укажите Telegram ID через запятую")
+        if not self.allowed_users and not self.admin_users:
+            errors.append("ALLOWED_USERS и ADMIN_USERS пусты — бот никого не пустит. Укажите Telegram ID через запятую")
         return errors
 
     def is_allowed(self, user_id: int) -> bool:
@@ -78,3 +78,7 @@ class Config:
     @property
     def users_dir(self) -> str:
         return os.path.join(self.work_dir, "users")
+
+    @property
+    def access_path(self) -> str:
+        return os.path.join(self.work_dir, "access.json")

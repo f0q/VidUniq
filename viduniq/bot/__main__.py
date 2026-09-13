@@ -32,7 +32,7 @@ def selftest(cfg: Config) -> int:
         print(f"{tool}: {p or 'НЕ НАЙДЕН'}")
     errors = cfg.validate()
     print(f"bot_api: {cfg.bot_api_url or 'https://api.telegram.org'} (local_mode={cfg.local_mode})")
-    print(f"allowed_users: {sorted(cfg.allowed_users) or '—'}")
+    print(f"allowed_users: {sorted(cfg.allowed_users) or '—'}  admin_users: {sorted(cfg.admin_users) or '—'}")
     print(f"work_dir: {cfg.work_dir}  max_parallel={cfg.max_parallel}  max_file_mb={cfg.max_file_mb}")
     for e in errors:
         print("✗", e)

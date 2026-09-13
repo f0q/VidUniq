@@ -211,3 +211,38 @@ def test_sweep_dir(tmp_path):
     assert sweep_dir(str(tmp_path), 3600) == 1
     assert fresh.exists() and not old.exists() and not (tmp_path / "a").exists()
     assert sweep_dir(str(tmp_path / "missing"), 1) == 0
+
+
+async def test_stranger_gets_one_reply_then_silence_and_block(env):
+    dp, bot, session, ctx = env
+    for i in range(12):
+        await dp.feed_update(bot, _msg(STRANGER, f"hi {i}"))
+    sent = _texts(session, SendMessage)
+    assert len(sent) == 1 and "200" in sent[0].text          # ответили ровно один раз
+    assert ctx.access.is_blocked(STRANGER.id)
+    await dp.feed_update(bot, _cb(STRANGER, "m"))            # и на кнопки чужого не реагируем
+    assert len(session.calls) == 1
+
+
+async def test_admin_commands_hidden_from_regular_users(env):
+    dp, bot, session, ctx = env
+    await dp.feed_update(bot, _msg(ALLOWED, "/adduser 555"))
+    assert not _texts(session, SendMessage)                  # обычный пользователь — тишина
+    assert not ctx.access.is_allowed(555)
+
+    ctx.access.admins.add(ALLOWED.id)
+    await dp.feed_update(bot, _msg(ALLOWED, "/adduser 555"))
+    assert ctx.access.is_allowed(555) and "добавлен" in _texts(session, SendMessage)[-1].text
+    await dp.feed_update(bot, _msg(User(id=555, is_bot=False, first_name="New"), "/id"))
+    assert "555" in _texts(session, SendMessage)[-1].text     # новый пользователь пущен
+    await dp.feed_update(bot, _msg(ALLOWED, "/listusers"))
+    text = _texts(session, SendMessage)[-1].text
+    assert "555" in text and "Админы" in text and str(ALLOWED.id) in text
+    await dp.feed_update(bot, _msg(ALLOWED, "/deluser 555"))
+    assert not ctx.access.is_allowed(555)
+    await dp.feed_update(bot, _msg(ALLOWED, "/blockuser 555"))
+    assert ctx.access.is_blocked(555)
+    await dp.feed_update(bot, _msg(ALLOWED, f"/deluser {ALLOWED.id}"))
+    assert "нельзя" in _texts(session, SendMessage)[-1].text
+    await dp.feed_update(bot, _msg(ALLOWED, "/adduser abc"))
+    assert "Использование" in _texts(session, SendMessage)[-1].text

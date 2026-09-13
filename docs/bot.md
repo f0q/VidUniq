@@ -70,7 +70,8 @@ cd VidUniq/deploy && git pull && docker compose pull && docker compose up -d
 | Переменная | По умолчанию | Описание |
 |---|---|---|
 | `BOT_TOKEN` | — | токен от @BotFather |
-| `ALLOWED_USERS` | — | ID пользователей через запятую (обязательно) |
+| `ALLOWED_USERS` | — | ID пользователей через запятую |
+| `ADMIN_USERS` | — | ID администраторов: имеют доступ и управляют списком пользователей командами внутри бота (список команд — у администратора) |
 | `API_ID`, `API_HASH` | — | для локального Bot API сервера (только Docker-вариант) |
 | `BOT_API_URL` | пусто → облако | адрес локального Bot API (`http://telegram-bot-api:8081` в compose) |
 | `LOCAL_MODE` | `1` если задан `BOT_API_URL` | читать файлы с общего диска, а не по HTTP |
@@ -85,7 +86,7 @@ cd VidUniq/deploy && git pull && docker compose pull && docker compose up -d
 - **Качество исходника.** Если отправить видео «как видео», клиент Telegram пережимает его при загрузке. Для максимального качества отправляйте **как файл** (📎 → Файл).
 - **Скорость.** libx264 `veryfast` на 2 vCPU кодирует 1080p примерно в реальном времени: минутный ролик ≈ минута. Очередь последовательная (`MAX_PARALLEL=1`); на многоядерном сервере можно поставить 2–3.
 - **Диск.** Исходник и результаты удаляются сразу после отправки ответа. В Docker-варианте бот забирает входящий файл с диска Bot API сервера переносом (копия у сервера не остаётся), а раз в 10 минут sweeper удаляет из каталога сервера всё старше `FILE_CACHE_TTL_MIN` (60 мин) — сам сервер ничего не чистит. Том `bot-data` хранит только настройки и картинки наложения.
-- **Безопасность.** Никогда не публикуйте `.env`. Бот отвечает незнакомцам только фразой «доступ закрыт» с их ID.
+- **Безопасность.** Никогда не публикуйте `.env`. Незнакомец получает ответ «доступ закрыт» с его ID ровно один раз, дальше игнорируется без единого запроса к Telegram; после 10 попыток — постоянная блокировка. Список доступа хранится в `WORK_DIR/access.json`.
 
 ---
 
@@ -102,4 +103,4 @@ docker compose up -d
 ```
 
 Commands: send media to process; send an image to set an overlay; `/settings` (uniqueization mode soft/medium/strong/manual, preset, filters, overlay position, audio, metadata, number of variants 1–5), `/cancel`, `/queue`, `/reset`, `/id`.
-Only user IDs listed in `ALLOWED_USERS` can use the bot. Tip: send videos **as a file** so Telegram doesn't recompress them. Encoding uses libx264 (~real-time on 2 vCPU).
+Only user IDs listed in `ALLOWED_USERS`/`ADMIN_USERS` can use the bot; admins manage the list with in-bot commands. Strangers get one reply with their ID, then silence; 10 attempts → permanent block. Tip: send videos **as a file** so Telegram doesn't recompress them. Encoding uses libx264 (~real-time on 2 vCPU).
