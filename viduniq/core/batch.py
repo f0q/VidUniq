@@ -1,19 +1,34 @@
-"""Обработка одного файла: probe → случайные zoom/speed → ffmpeg → откат hw. Без Qt."""
+"""Обработка одного файла: probe → уникализация/случайные zoom-speed → ffmpeg → откат hw. Без Qt."""
 from __future__ import annotations
 
 import logging
 import os
 import random
 import threading
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Callable, Optional
 
 from . import ffmpeg as ff
 from .ffmpeg import JobSettings, MediaInfo
+from .uniq import Strength, UniqParams, describe, roll
 
 log = logging.getLogger(__name__)
 
 Range = Optional[tuple[int, int]]
+
+
+@dataclass
+class ProcessResult:
+    out_path: str
+    params: Optional[UniqParams] = None     # что применилось (None — ручной режим без метаданных)
+    difference: Optional[float] = None      # 0..1, отличие от оригинала по кадрам
+
+    @property
+    def summary(self) -> str:
+        text = describe(self.params) if self.params else "ручные настройки"
+        if self.difference is not None:
+            text += f" · отличие {self.difference * 100:.0f}%"
+        return text
 
 
 def unique_out_path(out_dir: str, name: str, slug: str, ext: str = ".mp4") -> str:
@@ -40,6 +55,24 @@ def remove_quiet(path: Optional[str]) -> None:
             pass
 
 
+def prepare_job(job: JobSettings, zoom_range: Range, speed_range: Range, rng: random.Random,
+                info: Optional[MediaInfo] = None) -> JobSettings:
+    """Бросает кубики: режим уникализации или ручные диапазоны zoom/speed."""
+    if job.uniq is not None:
+        return job
+    if job.strength != Strength.OFF:
+        params = roll(job.strength, rng, mirror_mode=job.mirror_mode, touch_audio=job.touch_audio,
+                      source_fps=info.fps if info else 30.0)
+        return replace(job, uniq=params)
+    job = replace(job, zoom=pick(job.zoom, zoom_range, rng), speed=pick(job.speed, speed_range, rng))
+    if job.strip_metadata or job.mirror_mode != "never":
+        # ручной режим: только подмена метаданных / зеркало
+        params = roll(Strength.OFF, rng, mirror_mode=job.mirror_mode)
+        params = replace(params, zoom=job.zoom, speed=job.speed)
+        job = replace(job, uniq=params)
+    return job
+
+
 def process_file(
     src: str,
     out_dir: str,
@@ -51,11 +84,9 @@ def process_file(
     rng: Optional[random.Random] = None,
     ffmpeg_bin: Optional[str] = None,
     info: Optional[MediaInfo] = None,
-) -> str:
-    """Обрабатывает src в out_dir, возвращает путь результата.
-
-    Бросает ff.Cancelled, ff.FFmpegError, RuntimeError (probe). Недописанный файл удаляется.
-    """
+    measure: bool = True,
+) -> ProcessResult:
+    """Обрабатывает src в out_dir. Бросает ff.Cancelled, ff.FFmpegError, RuntimeError (probe)."""
     rng = rng or random.Random()
     ffmpeg_bin = ffmpeg_bin or ff.require("ffmpeg")
     os.makedirs(out_dir, exist_ok=True)
@@ -63,7 +94,7 @@ def process_file(
     if info.width == 0 or info.height == 0:
         raise RuntimeError("Не удалось определить размер видео")
 
-    job = replace(job, zoom=pick(job.zoom, zoom_range, rng), speed=pick(job.speed, speed_range, rng))
+    job = prepare_job(job, zoom_range, speed_range, rng, info)
     name = os.path.splitext(os.path.basename(src))[0]
     out_path = unique_out_path(out_dir, name, job.preset.slug)
     total = ff.expected_duration(info, job)
@@ -82,4 +113,9 @@ def process_file(
     except BaseException:
         remove_quiet(out_path)
         raise
-    return out_path
+
+    diff = None
+    if measure and not (cancel and cancel.is_set()):
+        from .similarity import difference
+        diff = difference(src, out_path, ffmpeg_bin=ffmpeg_bin)
+    return ProcessResult(out_path=out_path, params=job.uniq, difference=diff)

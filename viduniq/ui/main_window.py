@@ -323,8 +323,8 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"{idx + 1}/{self._total} · {name} · {int(frac * 100)}%")
         self._set_overall(idx, frac)
 
-    def _on_file_done(self, idx: int, out_path: str):
-        self.file_list.set_status(idx, DONE, out_path=out_path)
+    def _on_file_done(self, idx: int, out_path: str, applied: str):
+        self.file_list.set_status(idx, DONE, out_path=out_path, message=applied)
         self._done_count += 1
         self._set_overall(idx, 1.0)
 

@@ -16,6 +16,7 @@ from typing import Callable, Optional
 from .constants import (
     FILTERS, OVERLAY_POSITIONS, RANDOM_ANY_FILTER, RANDOM_COLOR_FILTER, Preset,
 )
+from .uniq import Strength, UniqParams, audio_chain, video_chain
 
 log = logging.getLogger(__name__)
 
@@ -164,6 +165,11 @@ class JobSettings:
     mute_audio: bool = False
     strip_metadata: bool = True
     hw_encode: bool = False
+    # Уникализация: режим и его опции; `uniq` — конкретные значения для файла (заполняет process_file)
+    strength: Strength = Strength.OFF
+    mirror_mode: str = "never"          # never | random | always
+    touch_audio: bool = True
+    uniq: Optional[UniqParams] = None
 
 
 def _even(v: int) -> int:
@@ -196,9 +202,10 @@ def resolve_filters(names: list[str], rng: random.Random) -> list[str]:
         if not tmpl:
             continue
         if name == RANDOM_COLOR_FILTER:
+            # Малозаметные сдвиги: раньше было ±0.15 / 0.8–1.2 / 0.8–1.3 / ±5° — картинка заметно менялась
             tmpl = tmpl.format(
-                br=rng.uniform(-0.15, 0.15), ct=rng.uniform(0.8, 1.2),
-                sat=rng.uniform(0.8, 1.3), hue=rng.uniform(-5, 5),
+                br=rng.uniform(-0.03, 0.03), ct=rng.uniform(0.96, 1.04),
+                sat=rng.uniform(0.95, 1.06), hue=rng.uniform(-2, 2),
             )
         out.append(tmpl)
     return out
@@ -221,8 +228,14 @@ def build_command(
     rng = rng or random.Random()
     cmd = [ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:1"]
 
+    u = s.uniq
+    zoom_p = u.zoom if u and u.strength != Strength.OFF else s.zoom
+    speed_p = u.speed if u and u.strength != Strength.OFF else s.speed
+
     # --- входы ---
     inputs = 0
+    if u and u.trim_start > 0 and info.duration > u.trim_start + 1.0:
+        cmd += ["-ss", f"{u.trim_start:.2f}"]
     cmd += ["-i", in_path]
     video_in = f"[{inputs}:v]"
     inputs += 1
@@ -277,6 +290,13 @@ def build_command(
         parts.append(f"{node}scale={tw}:{th}[fmt]")
         node = "[fmt]"
 
+    # 1b. Уникализация кадра (поворот, цвет, шум, виньетка, резкость)
+    if u:
+        uchain = video_chain(u, tw, th)
+        if uchain:
+            parts.append(f"{node}{','.join(uchain)}[unq]")
+            node = "[unq]"
+
     # 2. Цветовые фильтры
     chain = resolve_filters(s.filters, rng)
     if chain:
@@ -284,7 +304,7 @@ def build_command(
         node = "[flt]"
 
     # 3. Zoom
-    z = s.zoom / 100.0
+    z = zoom_p / 100.0
     if abs(z - 1.0) > 1e-5:
         steps = [f"scale=trunc(iw*{z:.4f}/2)*2:trunc(ih*{z:.4f}/2)*2:flags=bicubic"]
         if z > 1.0:
@@ -295,10 +315,15 @@ def build_command(
         node = "[zoom]"
 
     # 4. Скорость
-    sp = s.speed / 100.0
+    sp = speed_p / 100.0
     if abs(sp - 1.0) > 1e-5:
         parts.append(f"{node}setpts=PTS/{sp:.4f}[spd]")
         node = "[spd]"
+
+    # 4b. Зеркало
+    if u and u.mirror:
+        parts.append(f"{node}hflip[mir]")
+        node = "[mir]"
 
     # 5. Наложение
     if overlay_in:
@@ -307,12 +332,19 @@ def build_command(
         parts.append(f"{node}[ovl]overlay={pos}:shortest=1[ovd]")
         node = "[ovd]"
 
+    # 6. Частота кадров
+    if u and u.fps:
+        parts.append(f"{node}fps={u.fps:g}[fps]")
+        node = "[fps]"
+
     parts.append(f"{node}format=yuv420p[vout]")
 
     # --- аудио ---
     audio_out: Optional[str] = None
     if audio_in:
         tempo = _atempo_chain(sp) if abs(sp - 1.0) > 1e-5 and not needs_shortest else []
+        if u and not needs_shortest:
+            tempo += audio_chain(u)
         if tempo:
             parts.append(f"{audio_in}{','.join(tempo)}[aout]")
             audio_out = "[aout]"
@@ -330,11 +362,25 @@ def build_command(
         cmd += ["-c:v", "h264_videotoolbox", "-b:v", f"{_hw_bitrate_kbps(tw, th, info.fps)}k",
                 "-profile:v", "high", "-allow_sw", "1"]
     else:
-        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "24"]
+        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", str(u.crf if u else 24)]
+    if u and u.gop:
+        cmd += ["-g", str(u.gop)]
 
     cmd += ["-movflags", "+faststart"]
     if s.strip_metadata:
-        cmd += ["-map_metadata", "-1", "-map_chapters", "-1"]
+        # bitexact убирает отпечаток «Lavf/Lavc <версия>» из тегов контейнера
+        cmd += ["-map_metadata", "-1", "-map_chapters", "-1", "-fflags", "+bitexact"]
+        if u:
+            for k, v in u.metadata.items():
+                if k == "brand":
+                    cmd += ["-brand", v]
+                elif k.startswith("v:"):
+                    cmd += ["-metadata:s:v:0", f"{k[2:]}={v}"]
+                elif k.startswith("a:"):
+                    if audio_out:
+                        cmd += ["-metadata:s:a:0", f"{k[2:]}={v}"]
+                else:
+                    cmd += ["-metadata", f"{k}={v}"]
     if needs_shortest:
         cmd += ["-shortest"]
     cmd.append(out_path)
@@ -342,8 +388,13 @@ def build_command(
 
 
 def expected_duration(info: MediaInfo, s: JobSettings) -> float:
-    sp = s.speed / 100.0
-    return info.duration / sp if sp > 0 else info.duration
+    u = s.uniq
+    speed = u.speed if u and u.strength != Strength.OFF else s.speed
+    dur = info.duration
+    if u and u.trim_start > 0 and dur > u.trim_start + 1.0:
+        dur -= u.trim_start
+    sp = speed / 100.0
+    return dur / sp if sp > 0 else dur
 
 
 # ----------------------------------------------------------------------------

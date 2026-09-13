@@ -29,16 +29,32 @@ Native macOS app (Apple Silicon) — FFmpeg is bundled, nothing to install.</p>
 ## Features
 
 - Batch processing of videos and GIFs; drag & drop files **and folders** anywhere onto the window
+- **Uniqueization modes** soft / medium / strong: random subtle zoom, speed, rotation, trim, color, noise, audio pitch — different for every file; metadata replacement without the ffmpeg fingerprint; "difference from source" score
 - 17 social-media presets (Reels/TikTok, Shorts, Instagram Post/Story/Portrait/Landscape, VK, Telegram, YouTube, Facebook, Twitter, Snapchat, Pinterest) — **all of them work**, with black bars or a blurred background
 - Filters: random color shift, grayscale, sepia, invert, blur, flip, pixelate, VHS, contrast/saturation/brightness, warm/cool
 - Zoom and speed — fixed or randomized within a range per file
 - Image or GIF overlay in 9 positions
-- Metadata stripping, audio removal
+- Metadata stripping and replacement, audio removal
 - Hardware encoding via VideoToolbox on Apple Silicon (several times faster), with automatic fallback to libx264
 - Real per-file and overall progress, a **Cancel** button, per-file errors don't stop the queue
 - Settings persist between launches; the window shrinks down to 880×520; follows macOS light/dark theme
 
 <p align="center"><img src="docs/screenshot.png" width="900"></p>
+
+## How uniqueization works
+
+Platforms detect reposts by perceptual fingerprints of frames and audio, not by file bytes, so stripping metadata alone isn't enough. For **every file** VidUniq rolls the dice within the chosen mode and applies a bundle of subtle changes:
+
+| Mode | What changes |
+|---|---|
+| **Soft** | zoom 1–4%, speed ±2%, rotation up to 0.4°, trim 0.1–0.4 s from the start, color/gamma ±2–3%, slight sharpening, audio pitch ±1%, volume ±1 dB |
+| **Medium** (default) | zoom 3–8%, speed ±4%, rotation up to 1°, trim up to 0.8 s, color ±4–6%, light noise, vignette, different fps, pitch ±2%, ±2 dB |
+| **Strong** | zoom 5–12%, speed ±7%, rotation up to 2°, trim up to 1.5 s, color ±8–10%, noise, vignette, sharpening, fps, pitch ±3%, ±3 dB |
+| Off (manual) | only the zoom, speed and filters you set by hand |
+
+In every mode: random CRF and GOP length (changes file structure), and with the metadata option on — original tags are removed, **the ffmpeg fingerprint (`Lavf…`) is dropped**, and a random creation date plus plausible container/stream tags are written. Optional: horizontal mirroring (50/50) and audio tweaks.
+
+After processing you see **"difference NN%"** — the distance between perceptual hashes of the source and output frames (0% = visually identical). It's a guide, not a guarantee: platform algorithms are closed and change over time. In practice a new thumbnail, a different caption and a pause between reposts help too.
 
 ## Telegram bot on a server
 
@@ -71,7 +87,7 @@ The project grows with interest. **Star the repo** — it's the main signal to k
 
 | Stars | What's next |
 |---|---|
-| ✅ now | macOS Apple Silicon `.dmg`, all presets, VideoToolbox, progress & cancel; Telegram bot (beta) |
+| ✅ now | macOS Apple Silicon `.dmg`, uniqueization modes, all presets, VideoToolbox, progress & cancel; Telegram bot (beta) |
 | **100 ⭐** | **Windows (`.exe`) and macOS Intel builds** |
 | **150 ⭐** | **Telegram bot for a Linux server** — 🧪 beta is already in the repo ([docs/bot.md](docs/bot.md#english)); stable version, public Docker image in releases and improvements based on feedback |
 | 250 ⭐ | Settings profiles (save/load per network), several variants from one video in a single run |
@@ -110,6 +126,8 @@ GitHub Actions (`.github/workflows/build-macos.yml`) builds a DMG on every push 
 main.py                    entry point
 viduniq/app.py             QApplication, logging (~/Library/Logs/VidUniq/app.log)
 viduniq/core/constants.py  presets, filters, overlay positions
+viduniq/core/uniq.py       uniqueization modes: profiles, dice roll, filters, metadata
+viduniq/core/similarity.py difference score (frame dHash)
 viduniq/core/ffmpeg.py     ffmpeg discovery, probe, command builder, run with progress
 viduniq/core/worker.py     processing queue in a QThread
 viduniq/ui/                main window, file list, settings panel

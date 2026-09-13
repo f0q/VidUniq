@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -53,6 +54,9 @@ class FileEntry:
             parts.append(self.message.splitlines()[0][:60])
         elif self.status == DONE and self.out_path:
             parts.append("→ " + os.path.basename(self.out_path))
+            m = re.search(r"отличие \d+%", self.message or "")
+            if m:
+                parts.append(m.group(0))
         return "  ·  ".join(parts)
 
 
@@ -270,7 +274,7 @@ class FileListWidget(QListWidget):
             e.progress = progress
         if status == DONE:
             e.progress = 1.0
-        item.setToolTip(f"{e.path}\n\n{e.message}" if e.message else e.path)
+        item.setToolTip(f"{e.path}\n\n{'Применено: ' if status == DONE else ''}{e.message}" if e.message else e.path)
         self.update(self.indexFromItem(item))
         if status == RUNNING:
             self.scrollToItem(item)

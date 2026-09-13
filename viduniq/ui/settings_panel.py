@@ -16,6 +16,7 @@ from ..core.constants import (
     FILTERS, OUTPUT_PRESETS, OVERLAY_EXTENSIONS, OVERLAY_POSITIONS, SPEED_RANGE, ZOOM_RANGE,
 )
 from ..core.ffmpeg import JobSettings
+from ..core.uniq import STRENGTH_HINTS, Strength
 from ..core.worker import BatchSettings
 
 
@@ -114,6 +115,31 @@ class SettingsPanel(QScrollArea):
         root.setContentsMargins(12, 8, 12, 8)
         root.setSpacing(10)
 
+        # --- Уникализация ---
+        g = QGroupBox("Уникализация")
+        v = QVBoxLayout(g)
+        v.setContentsMargins(10, 6, 10, 8)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Режим:"))
+        self.strength = QComboBox()
+        for st in (Strength.SOFT, Strength.MEDIUM, Strength.STRONG, Strength.OFF):
+            self.strength.addItem(st.label, st.value)   # Qt превращает str-Enum в str — храним .value
+        self.strength.setCurrentIndex(1)
+        row.addWidget(self.strength, 1)
+        v.addLayout(row)
+        self.strength_hint = QLabel()
+        self.strength_hint.setWordWrap(True)
+        self.strength_hint.setStyleSheet("color: palette(placeholder-text);")
+        v.addWidget(self.strength_hint)
+        self.mirror = QCheckBox("Зеркалить по горизонтали (случайно, 50/50)")
+        self.mirror.setToolTip("Сильно меняет отпечаток кадра, но текст в кадре будет отражён")
+        self.touch_audio = QCheckBox("Слегка менять звук (тон и громкость ±1–3%)")
+        self.touch_audio.setChecked(True)
+        v.addWidget(self.mirror)
+        v.addWidget(self.touch_audio)
+        root.addWidget(g)
+        self.strength.currentIndexChanged.connect(self._on_strength)
+
         # --- Формат ---
         g = QGroupBox("Формат вывода")
         f = QFormLayout(g)
@@ -150,15 +176,15 @@ class SettingsPanel(QScrollArea):
         v.addLayout(row)
         root.addWidget(g)
 
-        # --- Zoom / Скорость ---
-        g = QGroupBox("Изменения кадра")
-        f = QFormLayout(g)
+        # --- Zoom / Скорость (ручной режим) ---
+        self.frame_group = QGroupBox("Изменения кадра (ручной режим)")
+        f = QFormLayout(self.frame_group)
         f.setContentsMargins(10, 6, 10, 8)
         self.zoom = RangeRow(*ZOOM_RANGE, 100, (95, 115))
         self.speed = RangeRow(*SPEED_RANGE, 100, (95, 110))
         f.addRow("Zoom:", self.zoom)
         f.addRow("Скорость:", self.speed)
-        root.addWidget(g)
+        root.addWidget(self.frame_group)
 
         # --- Наложение ---
         g = QGroupBox("Наложение картинки / GIF")
@@ -186,7 +212,9 @@ class SettingsPanel(QScrollArea):
         g = QGroupBox("Опции")
         v = QVBoxLayout(g)
         v.setContentsMargins(10, 6, 10, 8)
-        self.strip_meta = QCheckBox("Очистить метаданные")
+        self.strip_meta = QCheckBox("Очистить и подменить метаданные")
+        self.strip_meta.setToolTip("Убирает исходные теги и отпечаток ffmpeg; записывает случайную дату создания\n"
+                                   "и правдоподобные теги контейнера/потоков")
         self.strip_meta.setChecked(True)
         self.mute = QCheckBox("Удалить звук")
         self.hw = QCheckBox("Аппаратное кодирование (VideoToolbox)")
@@ -221,10 +249,22 @@ class SettingsPanel(QScrollArea):
 
         root.addStretch()
         self._on_preset()
+        self._on_strength()
         # Горизонтальной прокрутки нет — ширина панели не может быть меньше контента.
         self.setMinimumWidth(body.minimumSizeHint().width() + self.frameWidth() * 2 + 2)
 
+    def current_strength(self) -> Strength:
+        return Strength.parse(self.strength.currentData())
+
     # --- обработчики ---
+    def _on_strength(self):
+        st = self.current_strength()
+        self.strength_hint.setText(STRENGTH_HINTS[st])
+        manual = st == Strength.OFF
+        self.frame_group.setEnabled(manual)
+        self.frame_group.setTitle("Изменения кадра (ручной режим)" if manual else "Изменения кадра — задаются режимом")
+        self.touch_audio.setEnabled(not manual)
+
     def _on_preset(self):
         p = self.preset.currentData()
         self.blur_bg.setEnabled(not p.is_original)
@@ -272,12 +312,18 @@ class SettingsPanel(QScrollArea):
             mute_audio=self.mute.isChecked(),
             strip_metadata=self.strip_meta.isChecked(),
             hw_encode=self.hw.isChecked() and self.hw.isEnabled(),
+            strength=self.current_strength(),
+            mirror_mode="random" if self.mirror.isChecked() else "never",
+            touch_audio=self.touch_audio.isChecked(),
         )
         out_dir = self.out_dir.text().strip() if self.out_custom.isChecked() else None
         return BatchSettings(job=job, out_dir=out_dir, zoom_range=zoom_rng, speed_range=speed_rng)
 
     # --- QSettings ---
     def save(self, s: QSettings):
+        s.setValue("strength", self.current_strength().value)
+        s.setValue("mirror", self.mirror.isChecked())
+        s.setValue("touch_audio", self.touch_audio.isChecked())
         s.setValue("preset", self.preset.currentIndex())
         s.setValue("blur_bg", self.blur_bg.isChecked())
         s.setValue("filters", self.checked_filters())
@@ -296,6 +342,10 @@ class SettingsPanel(QScrollArea):
             v = s.value(key, default)
             return v if isinstance(v, bool) else str(v).lower() == "true"
 
+        st = Strength.parse(s.value("strength", "medium"))
+        self.strength.setCurrentIndex(max(0, self.strength.findData(st.value)))
+        self.mirror.setChecked(b("mirror", False))
+        self.touch_audio.setChecked(b("touch_audio", True))
         self.preset.setCurrentIndex(int(s.value("preset", 0)))
         self.blur_bg.setChecked(b("blur_bg", False))
         chosen = s.value("filters", []) or []

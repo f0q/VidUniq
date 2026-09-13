@@ -36,7 +36,7 @@ class BatchSummary:
 class Worker(QThread):
     file_started = Signal(int)
     file_progress = Signal(int, float)      # idx, 0..1
-    file_done = Signal(int, str)            # idx, out_path
+    file_done = Signal(int, str, str)       # idx, out_path, описание применённого
     file_failed = Signal(int, str)          # idx, message
     batch_finished = Signal(object)         # BatchSummary
 
@@ -69,15 +69,15 @@ class Worker(QThread):
             self.file_started.emit(idx)
             out_dir = self.settings.out_dir or os.path.join(os.path.dirname(src), "uniq")
             try:
-                out_path = process_file(
+                res = process_file(
                     src, out_dir, self.settings.job,
                     zoom_range=self.settings.zoom_range, speed_range=self.settings.speed_range,
                     on_progress=lambda frac, i=idx: self.file_progress.emit(i, frac),
                     cancel=self._cancel, rng=self._rng, ffmpeg_bin=ffmpeg_bin,
                 )
-                summary.done.append(out_path)
+                summary.done.append(res.out_path)
                 summary.out_dirs.add(out_dir)
-                self.file_done.emit(idx, out_path)
+                self.file_done.emit(idx, res.out_path, res.summary)
             except ff.Cancelled:
                 summary.cancelled = True
                 self.file_failed.emit(idx, "Отменено")

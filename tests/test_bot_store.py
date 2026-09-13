@@ -5,10 +5,14 @@ from viduniq.core.constants import preset_by_label
 
 
 def test_defaults_to_job():
+    from viduniq.core.uniq import Strength
     p = UserPrefs()
     j = p.to_job()
     assert j.preset.is_original and j.blur_background is False and j.hw_encode is False
     assert j.strip_metadata is True and j.mute_audio is False
+    assert j.strength == Strength.MEDIUM and j.mirror_mode == "never" and j.touch_audio is True
+    assert UserPrefs(strength="strong", mirror=True).to_job().mirror_mode == "random"
+    assert UserPrefs(strength="bogus").strength_enum == Strength.MEDIUM
 
 
 def test_blur_only_for_presets_and_overlay_must_exist(tmp_path):

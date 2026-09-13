@@ -107,6 +107,11 @@ async def test_start_and_settings_menu(env):
 
 async def test_callbacks_change_prefs(env):
     dp, bot, session, ctx = env
+    await dp.feed_update(bot, _cb(ALLOWED, "u:strong"))
+    await dp.feed_update(bot, _cb(ALLOWED, "t:mirror"))
+    assert ctx.store.get(ALLOWED.id).strength == "strong" and ctx.store.get(ALLOWED.id).mirror is True
+    await dp.feed_update(bot, _cb(ALLOWED, "u:off"))
+    session.calls.clear()
     await dp.feed_update(bot, _cb(ALLOWED, "p:reels"))
     await dp.feed_update(bot, _cb(ALLOWED, "f:1:0"))          # второй фильтр
     await dp.feed_update(bot, _cb(ALLOWED, "z:2"))            # 90–110%
@@ -156,6 +161,7 @@ async def test_video_end_to_end(env, tmp_path):
     videos = _texts(session, SendVideo)
     assert len(videos) == 2 and videos[0].width == 1280 and videos[0].height == 720
     assert "Вариант 1/2" in videos[0].caption and "Telegram Post" in videos[0].caption
+    assert "режим: средняя" in videos[0].caption and "отличие" in videos[0].caption
     edits = _texts(session, EditMessageText)
     assert any("✅" in e.text and "Готово: 2 из 2" in e.text for e in edits)
     assert not os.listdir(ctx.cfg.tmp_dir)           # всё убрано

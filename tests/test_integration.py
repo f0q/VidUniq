@@ -120,3 +120,46 @@ def test_cancel_stops_ffmpeg(samples, tmp_path):
 def test_hw_encode(samples, tmp_path):
     out = _run(samples["audio"], str(tmp_path / "hw.mp4"), ff.JobSettings(preset_by_label("Reels/TikTok"), hw_encode=True))
     assert (out.width, out.height) == (1080, 1920)
+
+
+@pytest.mark.parametrize("strength", ["soft", "medium", "strong"])
+def test_uniq_modes_end_to_end(samples, tmp_path, strength):
+    from viduniq.core.batch import process_file
+    from viduniq.core.uniq import Strength
+    src = _gen(tmp_path / f"src_{strength}.mp4", audio=True, dur=4, size="720x1280")
+    job = ff.JobSettings(preset_by_label("Reels/TikTok"), strength=Strength(strength), strip_metadata=True)
+    res = process_file(src, str(tmp_path / "out"), job, measure=True)
+    u = res.params
+    out = ff.probe(res.out_path)
+    assert (out.width, out.height) == (1080, 1920) and out.has_audio
+    expected = (4 - u.trim_start) / (u.speed / 100)
+    assert abs(out.duration - expected) < 0.35, (out.duration, expected, u)
+    raw = _probe_raw(res.out_path)
+    tags = raw["format"].get("tags", {})
+    assert tags.get("creation_time", "").startswith(u.metadata["creation_time"][:19])
+    assert tags.get("major_brand") == u.metadata["brand"]
+    assert "encoder" not in tags and "title" not in {k.lower() for k in tags}       # без отпечатка Lavf
+    vtags = [st for st in raw["streams"] if st["codec_type"] == "video"][0].get("tags", {})
+    assert vtags.get("encoder") == u.metadata["v:encoder"] and vtags.get("handler_name") == u.metadata["v:handler_name"]
+    assert res.difference is not None and 0.0 <= res.difference <= 1.0
+    assert "режим" in res.summary and "отличие" in res.summary
+
+
+def test_difference_orders_modes(samples, tmp_path):
+    """Идентичный файл ≈ 0; сильная ≥ мягкая по отличию (усреднено по нескольким броскам)."""
+    import random
+    from viduniq.core.batch import process_file
+    from viduniq.core.similarity import difference
+    from viduniq.core.uniq import Strength
+    src = _gen(tmp_path / "base.mp4", audio=False, dur=3, size="640x360")
+    assert difference(src, src) == 0.0
+    scores = {}
+    for st in (Strength.SOFT, Strength.STRONG):
+        vals = []
+        for seed in range(3):
+            job = ff.JobSettings(OUTPUT_PRESETS[0], strength=st, touch_audio=False)
+            res = process_file(src, str(tmp_path / st.value), job, rng=random.Random(seed), measure=True)
+            vals.append(res.difference)
+        scores[st] = sum(vals) / len(vals)
+    assert scores[Strength.SOFT] > 0.0
+    assert scores[Strength.STRONG] >= scores[Strength.SOFT]

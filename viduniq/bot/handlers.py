@@ -18,6 +18,7 @@ from aiogram.types import CallbackQuery, FSInputFile, Message, TelegramObject
 from .. import __version__
 from ..core import ffmpeg as ff
 from ..core.constants import OVERLAY_EXTENSIONS, VALID_INPUT_EXTENSIONS
+from ..core.uniq import Strength
 from . import keyboards as kb
 from .config import Config
 from .queue import ProcessingQueue, Task
@@ -29,8 +30,11 @@ HELP = (
     "<b>VidUniq</b> — уникализатор видео для Reels, TikTok, Shorts и других соцсетей.\n\n"
     "Пришлите видео или GIF — верну обработанную копию с вашими настройками.\n"
     "Несколько файлов можно слать подряд, они встанут в очередь.\n\n"
+    "Режим уникализации (мягкая / средняя / сильная) сам подбирает случайные малозаметные изменения "
+    "для каждого файла: zoom, скорость, поворот, обрезка начала, цвет, шум, тон звука, метаданные. "
+    "В подписи к результату видно, что применилось и насколько кадры отличаются от оригинала.\n\n"
     "<b>Команды</b>\n"
-    "/settings — формат, фильтры, zoom, скорость, наложение, звук, число вариантов\n"
+    "/settings — режим уникализации, формат, фильтры, наложение, звук, число вариантов\n"
     "/overlay — как добавить картинку/GIF поверх видео\n"
     "/cancel — отменить мои задачи\n"
     "/queue — что сейчас в очереди\n"
@@ -276,6 +280,11 @@ def build_router(ctx: Ctx) -> Router:
 
         if key == "m":
             text, markup = "⚙️ <b>Настройки</b>\n\n" + p.summary(), kb.main_menu(p)
+        elif key == "um":
+            text, markup = kb.strength_text(p), kb.strength_menu(p)
+        elif key == "u":
+            p = replace(p, strength=Strength.parse(parts[1]).value)
+            text, markup = kb.strength_text(p), kb.strength_menu(p)
         elif key == "pp":
             text, markup = "📐 <b>Формат вывода</b>", kb.presets_menu(p, int(parts[1]))
         elif key == "p":
@@ -322,7 +331,14 @@ def build_router(ctx: Ctx) -> Router:
                 p = replace(p, mute=not p.mute)
             elif parts[1] == "meta":
                 p = replace(p, strip_metadata=not p.strip_metadata)
-            text, markup = "⚙️ <b>Настройки</b>\n\n" + p.summary(), kb.main_menu(p)
+            elif parts[1] == "mirror":
+                p = replace(p, mirror=not p.mirror)
+            elif parts[1] == "audio":
+                p = replace(p, touch_audio=not p.touch_audio)
+            if parts[1] in ("mirror", "audio"):
+                text, markup = kb.strength_text(p), kb.strength_menu(p)
+            else:
+                text, markup = "⚙️ <b>Настройки</b>\n\n" + p.summary(), kb.main_menu(p)
         elif key == "vm":
             text, markup = ("🔁 <b>Вариантов на файл</b> — каждый со своими случайными zoom/скоростью/цветом",
                             kb.variants_menu(p, ctx.cfg.max_variants))
@@ -370,7 +386,7 @@ def build_router(ctx: Ctx) -> Router:
             except Exception:  # noqa: BLE001
                 info = ff.MediaInfo()
             desc = task.applied[i - 1] if i - 1 < len(task.applied) else task.prefs.preset.label
-            cap = ("✅ " + (f"Вариант {i}/{len(task.outputs)}\n" if len(task.outputs) > 1 else "") + desc)[:1000]
+            cap = ("✅ " + (f"Вариант {i}/{len(task.outputs)}\n" if len(task.outputs) > 1 else "") + html.escape(desc))[:1000]
             fname = os.path.basename(out)
             try:
                 await bot.send_video(

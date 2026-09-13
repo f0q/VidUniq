@@ -7,6 +7,7 @@
 
 ## Что умеет
 
+- Режимы уникализации мягкая / средняя / сильная (см. [README](../README.md#как-работает-уникализация)); в подписи к результату — что применилось и «отличие NN%»
 - Все 17 пресетов форматов, размытый фон, фильтры, zoom/скорость (фиксированные или случайные в диапазоне), наложение картинки/GIF, удаление звука, очистка метаданных — как в macOS-приложении
 - **Несколько вариантов из одного видео** (1–5) — каждый со своими случайными параметрами
 - Очередь: файлы можно слать подряд; статус обновляется прямо в сообщении (`▓▓▓░░ 45%`), кнопка «Отменить»
@@ -57,7 +58,7 @@ cd VidUniq/deploy && git pull && docker compose pull && docker compose up -d
 |---|---|
 | видео / GIF / файл | поставить в очередь и обработать с текущими настройками |
 | картинка (или GIF с подписью `overlay`) | установить наложение |
-| `/settings` | формат, фильтры, zoom, скорость, наложение, звук, метаданные, число вариантов |
+| `/settings` | режим уникализации (мягкая/средняя/сильная/ручная), формат, фильтры, наложение, звук, метаданные, число вариантов |
 | `/overlay`, `/overlay_off` | подсказка по наложению / убрать |
 | `/cancel` | отменить все мои задачи |
 | `/queue` | что сейчас обрабатывается и сколько в очереди |
@@ -100,5 +101,5 @@ cp .env.example .env && nano .env      # BOT_TOKEN, ALLOWED_USERS, API_ID, API_H
 docker compose up -d
 ```
 
-Commands: send media to process; send an image to set an overlay; `/settings` (preset, filters, zoom, speed, overlay position, audio, metadata, number of variants 1–5), `/cancel`, `/queue`, `/reset`, `/id`.
+Commands: send media to process; send an image to set an overlay; `/settings` (uniqueization mode soft/medium/strong/manual, preset, filters, overlay position, audio, metadata, number of variants 1–5), `/cancel`, `/queue`, `/reset`, `/id`.
 Only user IDs listed in `ALLOWED_USERS` can use the bot. Tip: send videos **as a file** so Telegram doesn't recompress them. Encoding uses libx264 (~real-time on 2 vCPU).

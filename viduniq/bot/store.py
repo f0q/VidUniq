@@ -9,6 +9,7 @@ from typing import Optional
 
 from ..core.constants import FILTERS, OUTPUT_PRESETS, OVERLAY_POSITIONS, Preset
 from ..core.ffmpeg import JobSettings
+from ..core.uniq import Strength
 
 Range = Optional[tuple[int, int]]
 
@@ -40,6 +41,9 @@ def preset_by_slug(slug: str) -> Preset:
 
 @dataclass
 class UserPrefs:
+    strength: str = "medium"                 # off | soft | medium | strong
+    mirror: bool = False
+    touch_audio: bool = True
     preset_slug: str = "uniq"
     blur_bg: bool = True
     filters: list[str] = field(default_factory=list)
@@ -56,6 +60,10 @@ class UserPrefs:
     @property
     def preset(self) -> Preset:
         return preset_by_slug(self.preset_slug)
+
+    @property
+    def strength_enum(self) -> Strength:
+        return Strength.parse(self.strength)
 
     def zoom_label(self) -> str:
         return f"{self.zoom_range[0]}–{self.zoom_range[1]}%" if self.zoom_range else f"{self.zoom}%"
@@ -75,16 +83,25 @@ class UserPrefs:
             mute_audio=self.mute,
             strip_metadata=self.strip_metadata,
             hw_encode=False,
+            strength=self.strength_enum,
+            mirror_mode="random" if self.mirror else "never",
+            touch_audio=self.touch_audio,
         )
 
     def summary(self) -> str:
         p = self.preset
+        st = self.strength_enum
+        extras = [x for x in ("зеркало 50/50" if self.mirror else "", "звук ±" if self.touch_audio and st != Strength.OFF else "") if x]
         lines = [
+            f"🎲 Уникализация: <b>{st.label}</b>" + (f" · {', '.join(extras)}" if extras else ""),
             f"📐 Формат: <b>{p.label}</b>" + (" · размытый фон" if self.blur_bg and not p.is_original else ""),
             f"🎨 Фильтры: <b>{', '.join(self.filters) if self.filters else 'нет'}</b>",
-            f"🔍 Zoom: <b>{self.zoom_label()}</b> · ⏩ Скорость: <b>{self.speed_label()}</b>",
+        ]
+        if st == Strength.OFF:
+            lines.append(f"🔍 Zoom: <b>{self.zoom_label()}</b> · ⏩ Скорость: <b>{self.speed_label()}</b>")
+        lines += [
             f"🖼 Наложение: <b>{'есть · ' + self.overlay_pos if self.overlay_path else 'нет'}</b>",
-            f"🔇 Звук: <b>{'удалить' if self.mute else 'оставить'}</b> · 🧹 Метаданные: <b>{'очистить' if self.strip_metadata else 'оставить'}</b>",
+            f"🔇 Звук: <b>{'удалить' if self.mute else 'оставить'}</b> · 🧹 Метаданные: <b>{'очистить и подменить' if self.strip_metadata else 'оставить'}</b>",
             f"🔁 Вариантов на файл: <b>{self.variants}</b>",
         ]
         return "\n".join(lines)

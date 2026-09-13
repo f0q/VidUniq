@@ -5,6 +5,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..core.constants import FILTERS, OUTPUT_PRESETS, OVERLAY_POSITIONS
+from ..core.uniq import STRENGTH_HINTS, Strength
 from .store import SPEED_CHOICES, ZOOM_CHOICES, UserPrefs
 
 FILTER_NAMES = list(FILTERS)
@@ -18,17 +19,39 @@ def _btn(text: str, data: str) -> InlineKeyboardButton:
 
 def main_menu(p: UserPrefs) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+    b.row(_btn(f"🎲 Уникализация: {p.strength_enum.label}", "um"))
     b.row(_btn(f"📐 Формат: {p.preset.name}", "pp:0"))
     if not p.preset.is_original:
         b.row(_btn(f"{'✅' if p.blur_bg else '☐'} Размытый фон вместо полос", "pb"))
     b.row(_btn(f"🎨 Фильтры ({len(p.filters)})", "fm:0"))
-    b.row(_btn(f"🔍 Zoom: {p.zoom_label()}", "zm"), _btn(f"⏩ Скорость: {p.speed_label()}", "sm"))
+    if p.strength_enum == Strength.OFF:
+        b.row(_btn(f"🔍 Zoom: {p.zoom_label()}", "zm"), _btn(f"⏩ Скорость: {p.speed_label()}", "sm"))
     b.row(_btn(f"🖼 Наложение: {'есть' if p.overlay_path else 'нет'}", "om"))
     b.row(_btn(f"{'🔇' if p.mute else '🔊'} Звук: {'удалить' if p.mute else 'оставить'}", "t:mute"),
-          _btn(f"{'🧹' if p.strip_metadata else '📋'} Метаданные: {'очистить' if p.strip_metadata else 'оставить'}", "t:meta"))
+          _btn(f"{'🧹' if p.strip_metadata else '📋'} Метаданные: {'подменить' if p.strip_metadata else 'оставить'}", "t:meta"))
     b.row(_btn(f"🔁 Вариантов: {p.variants}", "vm"))
     b.row(_btn("✖ Закрыть", "close"))
     return b.as_markup()
+
+
+STRENGTH_ORDER = [Strength.SOFT, Strength.MEDIUM, Strength.STRONG, Strength.OFF]
+
+
+def strength_menu(p: UserPrefs) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for st in STRENGTH_ORDER:
+        mark = "✅ " if st == p.strength_enum else ""
+        b.row(_btn(f"{mark}{st.label}", f"u:{st.value}"))
+    b.row(_btn(f"{'✅' if p.mirror else '☐'} Зеркалить (случайно 50/50)", "t:mirror"))
+    if p.strength_enum != Strength.OFF:
+        b.row(_btn(f"{'✅' if p.touch_audio else '☐'} Слегка менять звук (тон/громкость)", "t:audio"))
+    b.row(_btn("« Назад", "m"))
+    return b.as_markup()
+
+
+def strength_text(p: UserPrefs) -> str:
+    st = p.strength_enum
+    return f"🎲 <b>Уникализация: {st.label}</b>\n\n{STRENGTH_HINTS[st]}\n\nКаждый файл получает свой случайный набор значений."
 
 
 def presets_menu(p: UserPrefs, page: int) -> InlineKeyboardMarkup:
