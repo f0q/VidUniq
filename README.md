@@ -1,5 +1,6 @@
 <p align="center"><img src="viduniq/resources/icon.png" width="96"></p>
 <h1 align="center">VidUniq</h1>
+<p align="center"><b>Русский</b> · <a href="README.en.md">English</a></p>
 <p align="center">Уникализатор видео для Reels, TikTok, Shorts, Instagram, VK, Telegram и других соцсетей.<br>
 Нативное приложение для macOS (Apple Silicon) — FFmpeg уже внутри, ничего устанавливать не нужно.</p>
 
