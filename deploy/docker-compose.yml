@@ -1,0 +1,39 @@
+# VidUniq bot + локальный Telegram Bot API сервер (файлы до 2 ГБ).
+# 1) cp .env.example .env && отредактируйте   2) docker compose up -d   3) docker compose logs -f bot
+services:
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    restart: unless-stopped
+    environment:
+      TELEGRAM_API_ID: ${API_ID}
+      TELEGRAM_API_HASH: ${API_HASH}
+      TELEGRAM_LOCAL: 1            # отдаёт абсолютные пути к файлам на общем томе
+    volumes:
+      - botapi-data:/var/lib/telegram-bot-api
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8081 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  bot:
+    image: ${BOT_IMAGE:-ghcr.io/f0q/viduniq-bot:latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      telegram-bot-api:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      BOT_API_URL: http://telegram-bot-api:8081
+      LOCAL_MODE: "1"
+      WORK_DIR: /data
+    volumes:
+      - bot-data:/data
+      - botapi-data:/var/lib/telegram-bot-api:ro   # тот же путь, что видит Bot API сервер
+
+volumes:
+  botapi-data:
+  bot-data:

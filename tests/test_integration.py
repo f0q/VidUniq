@@ -112,7 +112,8 @@ def test_cancel_stops_ffmpeg(samples, tmp_path):
 
     with pytest.raises(ff.Cancelled):
         ff.run_with_progress(cmd, info.duration, _p, ev)
-    assert subprocess.run(["pgrep", "-f", "long_out.mp4"], capture_output=True).returncode != 0
+    out = subprocess.run(["ps", "-axo", "command"], capture_output=True, text=True).stdout
+    assert not any("ffmpeg" in ln and "long_out.mp4" in ln for ln in out.splitlines())
 
 
 @pytest.mark.skipif(not ff.has_videotoolbox(), reason="нет VideoToolbox")

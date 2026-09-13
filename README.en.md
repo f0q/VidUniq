@@ -40,6 +40,17 @@ Native macOS app (Apple Silicon) — FFmpeg is bundled, nothing to install.</p>
 
 <p align="center"><img src="docs/screenshot.png" width="900"></p>
 
+## Telegram bot on a server
+
+Same features through Telegram: send a video → get a uniqueized copy (or several variants at once). Installs on any Linux server in 5 minutes with Docker, files up to 2 GB, access limited to your Telegram IDs.
+
+```bash
+git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer/deploy
+cp .env.example .env && nano .env && docker compose up -d
+```
+
+Details: **[docs/bot.md](docs/bot.md#english)**
+
 ## What changed compared to the original
 
 | Before | After |
@@ -60,8 +71,9 @@ The project grows with interest. **Star the repo** — it's the main signal to k
 
 | Stars | What's next |
 |---|---|
-| ✅ now | macOS Apple Silicon `.dmg`, all presets, VideoToolbox, progress & cancel |
+| ✅ now | macOS Apple Silicon `.dmg`, all presets, VideoToolbox, progress & cancel; Telegram bot (beta) |
 | **100 ⭐** | **Windows (`.exe`) and macOS Intel builds** |
+| **150 ⭐** | **Telegram bot for a Linux server** — 🧪 beta is already in the repo ([docs/bot.md](docs/bot.md#english)); stable version, public Docker image in releases and improvements based on feedback |
 | 250 ⭐ | Settings profiles (save/load per network), several variants from one video in a single run |
 | 500 ⭐ | Parallel processing, result preview before running |
 
@@ -73,7 +85,7 @@ Requires Python ≥ 3.10 and ffmpeg/ffprobe (on `PATH`, e.g. `brew install ffmpe
 
 ```bash
 git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer
-uv venv && uv pip install -e ".[dev]"     # or: python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+uv venv && uv pip install -e ".[gui,dev]"     # or: python3 -m venv .venv && .venv/bin/pip install -e ".[gui,dev]"
 uv run python main.py
 ```
 
@@ -101,6 +113,8 @@ viduniq/core/constants.py  presets, filters, overlay positions
 viduniq/core/ffmpeg.py     ffmpeg discovery, probe, command builder, run with progress
 viduniq/core/worker.py     processing queue in a QThread
 viduniq/ui/                main window, file list, settings panel
+viduniq/bot/               Telegram bot (aiogram): queue, prefs, keyboards
+deploy/                    Dockerfile, docker-compose.yml, systemd unit for the bot
 scripts/                   fetch_ffmpeg.sh, make_icns.sh, build_mac.sh
 VidUniq.spec               PyInstaller
 ```

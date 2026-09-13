@@ -24,7 +24,7 @@ jobs:
         run: |
           uv python install 3.12
           uv venv --python 3.12
-          uv pip install -e ".[dev]"
+          uv pip install -e ".[gui,dev]"
 
       - name: Fetch static ffmpeg
         run: scripts/fetch_ffmpeg.sh

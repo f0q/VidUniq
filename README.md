@@ -40,6 +40,17 @@
 
 <p align="center"><img src="docs/screenshot.png" width="900"></p>
 
+## Telegram-бот на сервере
+
+Тот же функционал через Telegram: прислали видео → получили уникализированную копию (или несколько вариантов сразу). Ставится на любой Linux-сервер за 5 минут через Docker, файлы до 2 ГБ, доступ только для ваших Telegram ID.
+
+```bash
+git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer/deploy
+cp .env.example .env && nano .env && docker compose up -d
+```
+
+Подробно: **[docs/bot.md](docs/bot.md)**
+
 ## Что изменилось по сравнению с оригиналом
 
 | Было | Стало |
@@ -60,8 +71,9 @@
 
 | Звёзд | Что появится |
 |---|---|
-| ✅ сейчас | macOS Apple Silicon `.dmg`, все пресеты, VideoToolbox, прогресс и отмена |
+| ✅ сейчас | macOS Apple Silicon `.dmg`, все пресеты, VideoToolbox, прогресс и отмена; Telegram-бот (бета) |
 | **100 ⭐** | **Сборки для Windows (`.exe`) и macOS Intel** — под другие платформы |
+| **150 ⭐** | **Telegram-бот для Linux-сервера** — 🧪 бета уже в репозитории ([docs/bot.md](docs/bot.md)); стабильная версия, публичный Docker-образ в релизах и доработки по отзывам |
 | 250 ⭐ | Профили настроек (сохранять/загружать наборы под каждую соцсеть), несколько вариантов из одного видео за раз |
 | 500 ⭐ | Параллельная обработка нескольких файлов, предпросмотр результата до запуска |
 
@@ -73,7 +85,7 @@
 
 ```bash
 git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer
-uv venv && uv pip install -e ".[dev]"     # или: python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+uv venv && uv pip install -e ".[gui,dev]"     # или: python3 -m venv .venv && .venv/bin/pip install -e ".[gui,dev]"
 uv run python main.py
 ```
 
@@ -101,6 +113,8 @@ viduniq/core/constants.py  пресеты, фильтры, позиции нал
 viduniq/core/ffmpeg.py     поиск ffmpeg, probe, сборка команды, запуск с прогрессом
 viduniq/core/worker.py     очередь обработки в QThread
 viduniq/ui/                главное окно, список файлов, панель настроек
+viduniq/bot/               Telegram-бот (aiogram): очередь, настройки, клавиатуры
+deploy/                    Dockerfile, docker-compose.yml, systemd-unit для бота
 scripts/                   fetch_ffmpeg.sh, make_icns.sh, build_mac.sh
 VidUniq.spec               PyInstaller
 ```
