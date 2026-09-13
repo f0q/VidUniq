@@ -69,6 +69,17 @@ async def run(cfg: Config) -> None:
     dp = Dispatcher()
     dp.include_router(build_router(ctx))
 
+    from aiogram.exceptions import TelegramUnauthorizedError
+
+    try:
+        me = await bot.get_me()
+    except TelegramUnauthorizedError:
+        await bot.session.close()
+        raise SystemExit(
+            "Telegram отверг BOT_TOKEN (Unauthorized). Проверьте токен от @BotFather. "
+            "Если используете локальный Bot API, а токен раньше работал через облако — один раз выполните "
+            "curl https://api.telegram.org/bot<ТОКЕН>/logOut и перезапустите бота."
+        )
     await bot.set_my_commands([
         BotCommand(command="settings", description="Настройки обработки"),
         BotCommand(command="overlay", description="Картинка/GIF поверх видео"),
@@ -77,7 +88,6 @@ async def run(cfg: Config) -> None:
         BotCommand(command="reset", description="Сбросить настройки"),
         BotCommand(command="help", description="Помощь"),
     ])
-    me = await bot.get_me()
     logging.info("Бот @%s запущен (api=%s, local=%s)", me.username, cfg.bot_api_url or "cloud", cfg.local_mode)
     queue.start()
     try:
@@ -101,8 +111,12 @@ def main() -> int:
         return 2
     try:
         asyncio.run(run(cfg))
-    except (KeyboardInterrupt, SystemExit):
+    except KeyboardInterrupt:
         pass
+    except SystemExit as e:
+        if e.code and not isinstance(e.code, int):
+            logging.error("%s", e.code)
+            return 2
     return 0
 
 
