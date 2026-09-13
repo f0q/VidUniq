@@ -5,6 +5,7 @@ import asyncio
 import html
 import logging
 import os
+import shutil
 import time
 from dataclasses import replace
 from typing import Any, Awaitable, Callable
@@ -49,6 +50,23 @@ class Ctx:
         self.bot: Bot | None = None
         self._last_edit: dict[str, float] = {}
         self._last_text: dict[str, str] = {}
+
+
+async def fetch_file(bot: Bot, cfg: Config, file_id: str, dest: str) -> None:
+    """Забирает файл в dest. В local-режиме — переносит с диска Bot API сервера, чтобы не оставлять копию."""
+    f = await bot.get_file(file_id)
+    path = f.file_path or ""
+    if cfg.local_mode and os.path.isabs(path) and os.path.isfile(path):
+        try:
+            os.replace(path, dest)               # один том → мгновенно
+        except OSError:
+            shutil.copyfile(path, dest)          # разные тома → копия + удаление оригинала
+            try:
+                os.remove(path)
+            except OSError:
+                log.warning("Не удалось удалить кеш Bot API: %s", path)
+        return
+    await bot.download_file(path, destination=dest)
 
 
 def build_router(ctx: Ctx) -> Router:
@@ -189,7 +207,7 @@ def build_router(ctx: Ctx) -> Router:
                     prefs=replace(prefs), status_msg_id=status.message_id)
         task.src_path = os.path.join(ctx.cfg.tmp_dir, f"{task.id}_in{ext}")
         try:
-            await bot.download(file_obj, destination=task.src_path)
+            await fetch_file(bot, ctx.cfg, file_obj.file_id, task.src_path)
         except Exception as e:  # noqa: BLE001
             log.exception("download failed")
             await _edit(status, f"❌ Не удалось скачать файл: {html.escape(str(e))[:300]}")
@@ -213,7 +231,7 @@ def build_router(ctx: Ctx) -> Router:
         _drop_overlay(p)
         dest = os.path.join(ctx.cfg.users_dir, filename)
         try:
-            await bot.download(file_obj, destination=dest)
+            await fetch_file(bot, ctx.cfg, file_obj.file_id, dest)
         except Exception as e:  # noqa: BLE001
             await m.answer(f"❌ Не удалось сохранить картинку: {html.escape(str(e))[:200]}")
             return

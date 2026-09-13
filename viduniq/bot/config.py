@@ -31,6 +31,8 @@ class Config:
     max_variants: int = 5
     max_file_mb: int = 2000
     progress_interval: float = 3.0
+    bot_api_files_dir: str = ""           # каталог файлов локального Bot API (для очистки его кеша)
+    file_cache_ttl_min: int = 60          # sweeper: удалять файлы сервера старше N минут (0 — выключить)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -54,6 +56,8 @@ class Config:
             max_variants=max(1, min(10, _env_int("MAX_VARIANTS", 5))),
             max_file_mb=max(1, _env_int("MAX_FILE_MB", 2000 if api_url else 20)),
             progress_interval=max(1.0, float(os.environ.get("PROGRESS_INTERVAL", "3") or 3)),
+            bot_api_files_dir=os.environ.get("BOT_API_FILES_DIR", "").strip().rstrip("/"),
+            file_cache_ttl_min=max(0, _env_int("FILE_CACHE_TTL_MIN", 60)),
         )
 
     def validate(self) -> list[str]:

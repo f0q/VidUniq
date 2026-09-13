@@ -230,11 +230,40 @@ class ProcessingQueue:
 
     def purge_stale(self, max_age_sec: int = 86400):
         """Удаляет мусор в tmp старше суток (после падений)."""
-        now = time.time()
-        for name in os.listdir(self.tmp_dir):
-            p = os.path.join(self.tmp_dir, name)
+        sweep_dir(self.tmp_dir, max_age_sec, recursive=False)
+
+
+def sweep_dir(root: str, max_age_sec: float, recursive: bool = True) -> int:
+    """Удаляет файлы (и пустые папки) старше max_age_sec. Возвращает число удалённых файлов."""
+    if not root or not os.path.isdir(root):
+        return 0
+    now = time.time()
+    removed = 0
+    if not recursive:
+        for name in os.listdir(root):
+            p = os.path.join(root, name)
             try:
                 if now - os.path.getmtime(p) > max_age_sec:
-                    shutil.rmtree(p, ignore_errors=True) if os.path.isdir(p) else os.remove(p)
+                    if os.path.isdir(p):
+                        shutil.rmtree(p, ignore_errors=True)
+                    else:
+                        os.remove(p)
+                    removed += 1
             except OSError:
                 pass
+        return removed
+    for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+        for name in filenames:
+            p = os.path.join(dirpath, name)
+            try:
+                if now - os.path.getmtime(p) > max_age_sec:
+                    os.remove(p)
+                    removed += 1
+            except OSError:
+                pass
+        if dirpath != root:
+            try:
+                os.rmdir(dirpath)          # только если пустая
+            except OSError:
+                pass
+    return removed

@@ -30,9 +30,10 @@ services:
       BOT_API_URL: http://telegram-bot-api:8081
       LOCAL_MODE: "1"
       WORK_DIR: /data
+      BOT_API_FILES_DIR: /var/lib/telegram-bot-api   # бот сам чистит кеш сервера (тот ничего не удаляет)
     volumes:
       - bot-data:/data
-      - botapi-data:/var/lib/telegram-bot-api:ro   # тот же путь, что видит Bot API сервер
+      - botapi-data:/var/lib/telegram-bot-api        # тот же путь, что видит Bot API сервер
 
 volumes:
   botapi-data:

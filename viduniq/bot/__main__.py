@@ -47,7 +47,7 @@ async def run(cfg: Config) -> None:
     from aiogram.types import BotCommand
 
     from .handlers import Ctx, build_router
-    from .queue import ProcessingQueue
+    from .queue import ProcessingQueue, sweep_dir
     from .store import PrefsStore
 
     ff.require("ffmpeg")
@@ -90,9 +90,27 @@ async def run(cfg: Config) -> None:
     ])
     logging.info("Бот @%s запущен (api=%s, local=%s)", me.username, cfg.bot_api_url or "cloud", cfg.local_mode)
     queue.start()
+
+    async def sweeper():
+        # Кеш локального Bot API сервера (он сам ничего не удаляет) + свой tmp после падений.
+        ttl = cfg.file_cache_ttl_min * 60
+        while True:
+            try:
+                n = sweep_dir(cfg.tmp_dir, max(ttl, 600), recursive=False)
+                if cfg.bot_api_files_dir and ttl > 0:
+                    n += sweep_dir(cfg.bot_api_files_dir, ttl)
+                if n:
+                    logging.info("sweeper: удалено файлов: %d", n)
+            except Exception:  # noqa: BLE001
+                logging.exception("sweeper упал")
+            await asyncio.sleep(600)
+
+    sweep_task = asyncio.create_task(sweeper()) if cfg.file_cache_ttl_min > 0 else None
     try:
         await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
     finally:
+        if sweep_task:
+            sweep_task.cancel()
         await queue.stop()
         await bot.session.close()
 

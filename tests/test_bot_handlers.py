@@ -167,3 +167,41 @@ async def test_cancel_command_without_tasks(env):
     assert "нет активных" in _texts(session, SendMessage)[-1].text
     await dp.feed_update(bot, _msg(ALLOWED, "/queue"))
     assert "пуста" in _texts(session, SendMessage)[-1].text
+
+
+@pytest.mark.skipif(ff.locate("ffmpeg") is None, reason="ffmpeg не найден")
+async def test_local_mode_moves_file_from_bot_api_cache(env, tmp_path):
+    """В local-режиме исходник забирается с диска сервера (move), кеш сервера не остаётся."""
+    dp, bot, session, ctx = env
+    ctx.cfg.local_mode = True
+    cache = tmp_path / "botapi" / "videos"
+    cache.mkdir(parents=True)
+    src = cache / "file_1.mp4"
+    subprocess.run([ff.require("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=duration=1:size=160x120:rate=25",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src)], check=True)
+    session.src_file = str(src)
+    ctx.queue.start()
+    v = Video(file_id="v", file_unique_id="vu", width=160, height=120, duration=1, file_size=src.stat().st_size)
+    await dp.feed_update(bot, _msg(ALLOWED, video=v))
+    for _ in range(200):
+        await asyncio.sleep(0.1)
+        if not ctx.queue.running and not ctx.queue.pending:
+            break
+    await asyncio.sleep(0.3)
+    await ctx.queue.stop()
+    assert not src.exists()                          # кеш сервера освобождён
+    assert not os.listdir(ctx.cfg.tmp_dir)           # наш tmp пуст
+    assert len(_texts(session, SendVideo)) == 1
+
+
+def test_sweep_dir(tmp_path):
+    from viduniq.bot.queue import sweep_dir
+    old = tmp_path / "a" / "b" / "old.bin"
+    old.parent.mkdir(parents=True)
+    old.write_bytes(b"x")
+    os.utime(old, (1, 1))
+    fresh = tmp_path / "fresh.bin"
+    fresh.write_bytes(b"y")
+    assert sweep_dir(str(tmp_path), 3600) == 1
+    assert fresh.exists() and not old.exists() and not (tmp_path / "a").exists()
+    assert sweep_dir(str(tmp_path / "missing"), 1) == 0
