@@ -1,0 +1,55 @@
+name: Build macOS (arm64)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest   # Apple Silicon runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python and dependencies
+        run: |
+          uv python install 3.12
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+
+      - name: Fetch static ffmpeg
+        run: scripts/fetch_ffmpeg.sh
+
+      - name: Tests
+        run: uv run pytest -q
+
+      - name: Build .app and .dmg
+        run: scripts/build_mac.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VidUniq-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.dmg
+          generate_release_notes: true
+          body: |
+            ## Установка на macOS (Apple Silicon)
+            1. Скачайте `.dmg`, откройте и перетащите **VidUniq** в **Applications**.
+            2. Приложение не подписано Apple Developer ID, поэтому при первом запуске macOS покажет предупреждение.
+               Дважды кликните **«Снять карантин.command»** из образа — или откройте *Системные настройки → Конфиденциальность и безопасность → «Открыть всё равно»*.
