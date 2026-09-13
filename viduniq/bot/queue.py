@@ -9,7 +9,7 @@ import shutil
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Awaitable, Callable, Optional
 
 from ..core import ffmpeg as ff
@@ -32,6 +32,7 @@ class Task:
     progress: float = 0.0          # 0..1 внутри текущего варианта
     variant: int = 0               # текущий вариант (1-based) во время работы
     outputs: list[str] = field(default_factory=list)
+    applied: list[str] = field(default_factory=list)   # описание параметров каждого варианта
     error: Optional[str] = None
     started_at: float = 0.0
     done_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -39,6 +40,27 @@ class Task:
     @property
     def variants(self) -> int:
         return max(1, self.prefs.variants)
+
+
+def describe(job) -> str:
+    """Короткое описание применённых параметров для подписи к результату."""
+    p = job.preset
+    parts = [p.label if not p.is_original else "Размер оригинала"]
+    if job.blur_background and not p.is_original:
+        parts.append("размытый фон")
+    if job.filters:
+        parts.append("фильтры: " + ", ".join(job.filters))
+    if job.zoom != 100:
+        parts.append(f"zoom {job.zoom}%")
+    if job.speed != 100:
+        parts.append(f"скорость {job.speed}%")
+    if job.overlay_file:
+        parts.append("наложение")
+    if job.mute_audio:
+        parts.append("без звука")
+    if job.strip_metadata:
+        parts.append("метаданные очищены")
+    return " · ".join(parts)
 
 
 # Колбэки, которые задаёт слой Telegram
@@ -151,6 +173,7 @@ class ProcessingQueue:
     async def _run_task(self, loop: asyncio.AbstractEventLoop, task: Task):
         out_dir = os.path.join(self.tmp_dir, task.id)
         job = task.prefs.to_job()
+        from ..core.batch import pick
         for v in range(1, task.variants + 1):
             if task.cancel.is_set():
                 task.error = "Отменено"
@@ -161,10 +184,13 @@ class ProcessingQueue:
             def _prog(frac: float):
                 task.progress = frac
 
+            zoom = pick(job.zoom, task.prefs.zoom_range, self._rng)
+            speed = pick(job.speed, task.prefs.speed_range, self._rng)
+            variant_job = replace(job, zoom=zoom, speed=speed)
+            task.applied.append(describe(variant_job))
             fut = loop.run_in_executor(
-                None, lambda: process_file(
-                    task.src_path, out_dir, job,
-                    zoom_range=task.prefs.zoom_range, speed_range=task.prefs.speed_range,
+                None, lambda vj=variant_job: process_file(
+                    task.src_path, out_dir, vj,
                     on_progress=_prog, cancel=task.cancel, rng=self._rng,
                 ),
             )

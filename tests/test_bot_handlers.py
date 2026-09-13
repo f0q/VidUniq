@@ -155,7 +155,7 @@ async def test_video_end_to_end(env, tmp_path):
     await ctx.queue.stop()
     videos = _texts(session, SendVideo)
     assert len(videos) == 2 and videos[0].width == 1280 and videos[0].height == 720
-    assert "вариант 1/2" in videos[0].caption
+    assert "Вариант 1/2" in videos[0].caption and "Telegram Post" in videos[0].caption
     edits = _texts(session, EditMessageText)
     assert any("✅" in e.text and "Готово: 2 из 2" in e.text for e in edits)
     assert not os.listdir(ctx.cfg.tmp_dir)           # всё убрано

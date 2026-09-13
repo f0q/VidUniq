@@ -1,6 +1,6 @@
 [project]
 name = "viduniq"
-version = "2.0.0"
+version = "2.1.0"
 description = "Уникализатор видео для Reels, TikTok, Shorts и других соцсетей"
 readme = "README.md"
 requires-python = ">=3.10"

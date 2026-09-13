@@ -10,3 +10,4 @@ app.log
 .pytest_cache/
 .DS_Store
 deploy/.env
+bot-data/

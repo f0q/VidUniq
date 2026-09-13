@@ -351,7 +351,8 @@ def build_router(ctx: Ctx) -> Router:
                 info = ff.probe(out)
             except Exception:  # noqa: BLE001
                 info = ff.MediaInfo()
-            cap = f"{task.prefs.preset.label}" + (f" · вариант {i}/{len(task.outputs)}" if len(task.outputs) > 1 else "")
+            desc = task.applied[i - 1] if i - 1 < len(task.applied) else task.prefs.preset.label
+            cap = ("✅ " + (f"Вариант {i}/{len(task.outputs)}\n" if len(task.outputs) > 1 else "") + desc)[:1000]
             fname = os.path.basename(out)
             try:
                 await bot.send_video(

@@ -64,6 +64,10 @@ jobs:
 
             ⭐ Понравилось — поставьте звезду: при 100 ⭐ появятся сборки для Windows и macOS Intel ([roadmap](https://github.com/f0q/VidUniq#roadmap)).
 
+            ## 🤖 Telegram-бот для Linux-сервера
+            Тот же уникализатор через Telegram: прислали видео → получили обработанную копию (или несколько вариантов с разными случайными параметрами). Все пресеты, фильтры, zoom/скорость, наложение, очистка метаданных; очередь с прогрессом и отменой; доступ только для ваших Telegram ID; файлы до 2 ГБ.
+            Готовый Docker-образ: `ghcr.io/f0q/viduniq-bot:latest` (amd64 + arm64). Установка за 5 минут — [docs/bot.md](https://github.com/f0q/VidUniq/blob/main/docs/bot.md).
+
             ---
 
             ## Install (macOS 12+, Apple Silicon)
@@ -80,3 +84,7 @@ jobs:
             > - Terminal: `xattr -cr /Applications/VidUniq.app`
 
             ⭐ Enjoying it? Star the repo — at 100 ⭐ Windows and macOS Intel builds will follow ([roadmap](https://github.com/f0q/VidUniq/blob/main/README.en.md#roadmap)). [English README](https://github.com/f0q/VidUniq/blob/main/README.en.md)
+
+            ## 🤖 Telegram bot for a Linux server
+            Same uniqueizer through Telegram: send a video → get a processed copy (or several variants with different random parameters). All presets, filters, zoom/speed, overlay, metadata stripping; queue with progress and cancel; access limited to your Telegram IDs; files up to 2 GB.
+            Ready Docker image: `ghcr.io/f0q/viduniq-bot:latest` (amd64 + arm64). 5-minute setup — [docs/bot.md](https://github.com/f0q/VidUniq/blob/main/docs/bot.md#english).
