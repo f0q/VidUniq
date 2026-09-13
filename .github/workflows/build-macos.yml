@@ -62,7 +62,7 @@ jobs:
             > - *Системные настройки → Конфиденциальность и безопасность → «Открыть всё равно»*, или
             > - в Терминале: `xattr -cr /Applications/VidUniq.app`
 
-            ⭐ Понравилось — поставьте звезду: при 100 ⭐ появятся сборки для Windows и macOS Intel ([roadmap](https://github.com/f0q/Video-Uniqueizer#roadmap)).
+            ⭐ Понравилось — поставьте звезду: при 100 ⭐ появятся сборки для Windows и macOS Intel ([roadmap](https://github.com/f0q/VidUniq#roadmap)).
 
             ---
 
@@ -79,4 +79,4 @@ jobs:
             > - *System Settings → Privacy & Security → "Open Anyway"*, or
             > - Terminal: `xattr -cr /Applications/VidUniq.app`
 
-            ⭐ Enjoying it? Star the repo — at 100 ⭐ Windows and macOS Intel builds will follow ([roadmap](https://github.com/f0q/Video-Uniqueizer/blob/main/README.en.md#roadmap)). [English README](https://github.com/f0q/Video-Uniqueizer/blob/main/README.en.md)
+            ⭐ Enjoying it? Star the repo — at 100 ⭐ Windows and macOS Intel builds will follow ([roadmap](https://github.com/f0q/VidUniq/blob/main/README.en.md#roadmap)). [English README](https://github.com/f0q/VidUniq/blob/main/README.en.md)

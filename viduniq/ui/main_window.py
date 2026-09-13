@@ -112,7 +112,7 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._open_log)
         m_help.addAction(a)
         a = QAction("Проект на GitHub", self)
-        a.triggered.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/f0q/Video-Uniqueizer")))
+        a.triggered.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/f0q/VidUniq")))
         m_help.addAction(a)
         a = QAction(f"О программе {APP_NAME}", self)
         a.setMenuRole(QAction.MenuRole.AboutRole)

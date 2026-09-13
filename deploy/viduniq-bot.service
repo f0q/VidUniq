@@ -1,7 +1,7 @@
 # Вариант без Docker (облачный Bot API, лимит 20 МБ на вход / 50 МБ на выход).
 #   sudo apt install ffmpeg python3-venv
 #   sudo useradd -r -m -d /opt/viduniq viduniq
-#   sudo -u viduniq git clone https://github.com/f0q/Video-Uniqueizer.git /opt/viduniq/app
+#   sudo -u viduniq git clone https://github.com/f0q/VidUniq.git /opt/viduniq/app
 #   sudo -u viduniq python3 -m venv /opt/viduniq/venv && sudo -u viduniq /opt/viduniq/venv/bin/pip install "/opt/viduniq/app[bot]"
 #   sudo cp /opt/viduniq/app/deploy/.env.example /opt/viduniq/.env && sudo nano /opt/viduniq/.env
 #   sudo cp /opt/viduniq/app/deploy/viduniq-bot.service /etc/systemd/system/ && sudo systemctl enable --now viduniq-bot

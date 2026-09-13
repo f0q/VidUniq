@@ -8,7 +8,7 @@ Native macOS app (Apple Silicon) — FFmpeg is bundled, nothing to install.</p>
 
 ## Download
 
-**[Releases → VidUniq-x.y.z-arm64.dmg](https://github.com/f0q/Video-Uniqueizer/releases/latest)** — macOS 12+, Apple Silicon (M1–M4).
+**[Releases → VidUniq-x.y.z-arm64.dmg](https://github.com/f0q/VidUniq/releases/latest)** — macOS 12+, Apple Silicon (M1–M4).
 
 1. Open the `.dmg` and drag **VidUniq** to **Applications**.
 2. Launch it. macOS will show a warning on first launch — see below, this is expected.
@@ -17,7 +17,7 @@ Native macOS app (Apple Silicon) — FFmpeg is bundled, nothing to install.</p>
 > **"Cannot verify the developer" / "App is damaged" — this is not a virus and not a bug.**
 > Apple charges $99/year for a code-signing certificate; VidUniq is a free open-source project without one.
 > macOS shows the same warning for **any** unsigned app. The source is open and every build runs publicly in
-> [GitHub Actions](https://github.com/f0q/Video-Uniqueizer/actions), so you can verify the `.dmg` contains exactly what is in this repository.
+> [GitHub Actions](https://github.com/f0q/VidUniq/actions), so you can verify the `.dmg` contains exactly what is in this repository.
 >
 > **How to open (once):**
 > - double-click **«Снять карантин.command»** ("Remove quarantine") from the disk image after copying VidUniq to Applications, **or**
@@ -45,7 +45,7 @@ Native macOS app (Apple Silicon) — FFmpeg is bundled, nothing to install.</p>
 Same features through Telegram: send a video → get a uniqueized copy (or several variants at once). Installs on any Linux server in 5 minutes with Docker, files up to 2 GB, access limited to your Telegram IDs.
 
 ```bash
-git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer/deploy
+git clone https://github.com/f0q/VidUniq.git && cd VidUniq/deploy
 cp .env.example .env && nano .env && docker compose up -d
 ```
 
@@ -77,14 +77,14 @@ The project grows with interest. **Star the repo** — it's the main signal to k
 | 250 ⭐ | Settings profiles (save/load per network), several variants from one video in a single run |
 | 500 ⭐ | Parallel processing, result preview before running |
 
-Ideas and bugs → [Issues](https://github.com/f0q/Video-Uniqueizer/issues). Pull requests are welcome.
+Ideas and bugs → [Issues](https://github.com/f0q/VidUniq/issues). Pull requests are welcome.
 
 ## Running from source
 
 Requires Python ≥ 3.10 and ffmpeg/ffprobe (on `PATH`, e.g. `brew install ffmpeg`, or in `vendor/ffmpeg/`).
 
 ```bash
-git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer
+git clone https://github.com/f0q/VidUniq.git && cd VidUniq
 uv venv && uv pip install -e ".[gui,dev]"     # or: python3 -m venv .venv && .venv/bin/pip install -e ".[gui,dev]"
 uv run python main.py
 ```

@@ -26,8 +26,8 @@
 **4. Запустите:**
 
 ```bash
-git clone https://github.com/f0q/Video-Uniqueizer.git
-cd Video-Uniqueizer/deploy
+git clone https://github.com/f0q/VidUniq.git
+cd VidUniq/deploy
 cp .env.example .env
 nano .env                 # BOT_TOKEN, ALLOWED_USERS, API_ID, API_HASH
 docker compose up -d
@@ -44,7 +44,7 @@ docker compose logs -f bot   # должно быть: «Бот @имя запу�
 ### Обновление
 
 ```bash
-cd Video-Uniqueizer/deploy && git pull && docker compose pull && docker compose up -d
+cd VidUniq/deploy && git pull && docker compose pull && docker compose up -d
 ```
 
 ## Установка без Docker (systemd)
@@ -95,7 +95,7 @@ cd Video-Uniqueizer/deploy && git pull && docker compose pull && docker compose 
 Setup: create a bot with [@BotFather](https://t.me/BotFather), get your user ID from [@userinfobot](https://t.me/userinfobot), get `api_id`/`api_hash` at [my.telegram.org](https://my.telegram.org) (needed for the bundled local Bot API server, which lifts the file limit to 2 GB), then:
 
 ```bash
-git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer/deploy
+git clone https://github.com/f0q/VidUniq.git && cd VidUniq/deploy
 cp .env.example .env && nano .env      # BOT_TOKEN, ALLOWED_USERS, API_ID, API_HASH
 docker compose up -d
 ```

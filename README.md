@@ -8,7 +8,7 @@
 
 ## Скачать
 
-**[Releases → VidUniq-x.y.z-arm64.dmg](https://github.com/f0q/Video-Uniqueizer/releases/latest)** — macOS 12+, Apple Silicon (M1–M4).
+**[Releases → VidUniq-x.y.z-arm64.dmg](https://github.com/f0q/VidUniq/releases/latest)** — macOS 12+, Apple Silicon (M1–M4).
 
 1. Откройте `.dmg` и перетащите **VidUniq** в **Applications**.
 2. Запустите. При первом запуске macOS покажет предупреждение — см. ниже, это нормально.
@@ -17,7 +17,7 @@
 > **«Не удаётся проверить разработчика» / «Приложение повреждено» — это не вирус и не ошибка.**
 > Apple берёт $99 в год за сертификат подписи, а VidUniq — бесплатный open-source проект без такого сертификата.
 > macOS одинаково ругается на **любое** неподписанное приложение. Исходный код открыт, сборка делается публично
-> в [GitHub Actions](https://github.com/f0q/Video-Uniqueizer/actions) — вы можете проверить, что в `.dmg` попало ровно то, что в репозитории.
+> в [GitHub Actions](https://github.com/f0q/VidUniq/actions) — вы можете проверить, что в `.dmg` попало ровно то, что в репозитории.
 >
 > **Как открыть (один раз):**
 > - дважды кликните **«Снять карантин.command»** из образа диска (после копирования VidUniq в Applications), **или**
@@ -45,7 +45,7 @@
 Тот же функционал через Telegram: прислали видео → получили уникализированную копию (или несколько вариантов сразу). Ставится на любой Linux-сервер за 5 минут через Docker, файлы до 2 ГБ, доступ только для ваших Telegram ID.
 
 ```bash
-git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer/deploy
+git clone https://github.com/f0q/VidUniq.git && cd VidUniq/deploy
 cp .env.example .env && nano .env && docker compose up -d
 ```
 
@@ -77,14 +77,14 @@ cp .env.example .env && nano .env && docker compose up -d
 | 250 ⭐ | Профили настроек (сохранять/загружать наборы под каждую соцсеть), несколько вариантов из одного видео за раз |
 | 500 ⭐ | Параллельная обработка нескольких файлов, предпросмотр результата до запуска |
 
-Идеи и баги — в [Issues](https://github.com/f0q/Video-Uniqueizer/issues). Pull requests приветствуются.
+Идеи и баги — в [Issues](https://github.com/f0q/VidUniq/issues). Pull requests приветствуются.
 
 ## Запуск из исходников
 
 Нужен Python ≥ 3.10 и ffmpeg/ffprobe (в `PATH`, например `brew install ffmpeg`, либо в `vendor/ffmpeg/`).
 
 ```bash
-git clone https://github.com/f0q/Video-Uniqueizer.git && cd Video-Uniqueizer
+git clone https://github.com/f0q/VidUniq.git && cd VidUniq
 uv venv && uv pip install -e ".[gui,dev]"     # или: python3 -m venv .venv && .venv/bin/pip install -e ".[gui,dev]"
 uv run python main.py
 ```
