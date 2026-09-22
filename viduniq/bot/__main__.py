@@ -47,7 +47,7 @@ async def run(cfg: Config) -> None:
     from aiogram.types import BotCommand
 
     from .handlers import Ctx, build_router
-    from .queue import ProcessingQueue, sweep_dir
+    from .queue import ProcessingQueue, sweep_bot_api_cache, sweep_dir
     from .store import PrefsStore
 
     ff.require("ffmpeg")
@@ -98,7 +98,7 @@ async def run(cfg: Config) -> None:
             try:
                 n = sweep_dir(cfg.tmp_dir, max(ttl, 600), recursive=False)
                 if cfg.bot_api_files_dir and ttl > 0:
-                    n += sweep_dir(cfg.bot_api_files_dir, ttl)
+                    n += sweep_bot_api_cache(cfg.bot_api_files_dir, ttl)
                 if n:
                     logging.info("sweeper: удалено файлов: %d", n)
             except Exception:  # noqa: BLE001

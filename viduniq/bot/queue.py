@@ -210,7 +210,35 @@ class ProcessingQueue:
         sweep_dir(self.tmp_dir, max_age_sec, recursive=False)
 
 
-def sweep_dir(root: str, max_age_sec: float, recursive: bool = True) -> int:
+# Каталоги, куда telegram-bot-api кладёт скачанные медиа. Всё остальное в папке токена —
+# состояние TDLib (td.binlog и т.п.), удалять его нельзя: сервер теряет базу файлов и
+# отвечает «wrong file_id or the file is temporarily unavailable».
+BOT_API_MEDIA_DIRS = {
+    "photos", "profile_photos", "videos", "video_notes", "video_stories", "animations",
+    "documents", "audios", "music", "voice", "stickers", "thumbnails", "secret",
+    "secret_thumbnails", "passport", "ringtones", "wallpapers", "notification_sounds", "temp",
+}
+
+
+def sweep_bot_api_cache(root: str, max_age_sec: float) -> int:
+    """Чистит только медиа-кеш локального Bot API сервера, не трогая его состояние."""
+    if not root or not os.path.isdir(root):
+        return 0
+    removed = 0
+    for token_dir in os.listdir(root):
+        token_path = os.path.join(root, token_dir)
+        if not os.path.isdir(token_path):
+            continue                      # файлы в корне — не наше дело
+        for name in os.listdir(token_path):
+            if name not in BOT_API_MEDIA_DIRS:
+                continue                  # td.binlog и прочее состояние пропускаем
+            media_path = os.path.join(token_path, name)
+            if os.path.isdir(media_path):
+                removed += sweep_dir(media_path, max_age_sec, keep_root=True)
+    return removed
+
+
+def sweep_dir(root: str, max_age_sec: float, recursive: bool = True, keep_root: bool = True) -> int:
     """Удаляет файлы (и пустые папки) старше max_age_sec. Возвращает число удалённых файлов."""
     if not root or not os.path.isdir(root):
         return 0
@@ -238,7 +266,7 @@ def sweep_dir(root: str, max_age_sec: float, recursive: bool = True) -> int:
                     removed += 1
             except OSError:
                 pass
-        if dirpath != root:
+        if dirpath != root or not keep_root:
             try:
                 os.rmdir(dirpath)          # только если пустая
             except OSError:

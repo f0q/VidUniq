@@ -200,6 +200,34 @@ async def test_local_mode_moves_file_from_bot_api_cache(env, tmp_path):
     assert len(_texts(session, SendVideo)) == 1
 
 
+def test_sweep_bot_api_cache_keeps_tdlib_state(tmp_path):
+    """Кеш медиа чистится, состояние сервера (td.binlog и папки) остаётся — иначе ломаются file_id."""
+    from viduniq.bot.queue import sweep_bot_api_cache
+    token = tmp_path / "123:ABC"
+    (token / "videos").mkdir(parents=True)
+    (token / "temp").mkdir()
+    old_video = token / "videos" / "file_1.mp4"
+    old_video.write_bytes(b"x")
+    os.utime(old_video, (1, 1))
+    fresh_video = token / "videos" / "file_2.mp4"
+    fresh_video.write_bytes(b"x")
+    binlog = token / "td.binlog"
+    binlog.write_bytes(b"state")
+    os.utime(binlog, (1, 1))              # старый, но трогать нельзя
+    db_dir = token / "db"
+    db_dir.mkdir()
+    db_file = db_dir / "td.sqlite"
+    db_file.write_bytes(b"state")
+    os.utime(db_file, (1, 1))
+
+    assert sweep_bot_api_cache(str(tmp_path), 3600) == 1
+    assert not old_video.exists()
+    assert fresh_video.exists()
+    assert binlog.exists() and db_file.exists()
+    assert (token / "videos").is_dir() and (token / "temp").is_dir()
+    assert sweep_bot_api_cache(str(tmp_path / "missing"), 1) == 0
+
+
 def test_sweep_dir(tmp_path):
     from viduniq.bot.queue import sweep_dir
     old = tmp_path / "a" / "b" / "old.bin"
@@ -209,7 +237,8 @@ def test_sweep_dir(tmp_path):
     fresh = tmp_path / "fresh.bin"
     fresh.write_bytes(b"y")
     assert sweep_dir(str(tmp_path), 3600) == 1
-    assert fresh.exists() and not old.exists() and not (tmp_path / "a").exists()
+    assert fresh.exists() and not old.exists()
+    assert not (tmp_path / "a" / "b").exists() and (tmp_path).is_dir()
     assert sweep_dir(str(tmp_path / "missing"), 1) == 0
 
 
