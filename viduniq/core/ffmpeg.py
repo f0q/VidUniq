@@ -332,9 +332,13 @@ def build_command(
         parts.append(f"{node}[ovl]overlay={pos}:shortest=1[ovd]")
         node = "[ovd]"
 
-    # 6. Частота кадров
-    if u and u.fps:
-        parts.append(f"{node}fps={u.fps:g}[fps]")
+    # 6. Частота кадров: либо выбранная режимом (никогда не ниже исходной), либо фиксация
+    #    исходной — при изменении скорости setpts иначе «уносит» итоговый fps на ±несколько %.
+    target_fps = None
+    if u:
+        target_fps = u.fps or (info.fps if info.fps > 0 and abs(sp - 1.0) > 1e-5 else None)
+    if target_fps:
+        parts.append(f"{node}fps={target_fps:g}[fps]")
         node = "[fps]"
 
     parts.append(f"{node}format=yuv420p[vout]")

@@ -145,6 +145,25 @@ def test_uniq_modes_end_to_end(samples, tmp_path, strength):
     assert "режим" in res.summary and "отличие" in res.summary
 
 
+@pytest.mark.parametrize("rate", [30, 60])
+def test_output_fps_matches_source(tmp_path, rate):
+    """Частота кадров результата равна исходной при любом режиме и любой скорости."""
+    import random
+    from viduniq.core.batch import process_file
+    from viduniq.core.uniq import Strength
+    src = str(tmp_path / f"src{rate}.mp4")
+    subprocess.run([ff.require("ffmpeg"), "-y", "-v", "error", "-f", "lavfi",
+                    "-i", f"testsrc=duration=3:size=480x854:rate={rate}",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", src], check=True)
+    for st in (Strength.SOFT, Strength.MEDIUM, Strength.STRONG):
+        for seed in (0, 3):
+            job = ff.JobSettings(preset_by_label("Reels/TikTok"), strength=st)
+            res = process_file(src, str(tmp_path / "o"), job, rng=random.Random(seed), measure=False)
+            out = ff.probe(res.out_path)
+            assert abs(out.fps - rate) < 0.5, (st, seed, out.fps, res.params.speed, res.params.fps)
+            assert res.size_in > 0 and res.size_out > 0
+
+
 def test_difference_orders_modes(samples, tmp_path):
     """Идентичный файл ≈ 0; сильная ≥ мягкая по отличию (усреднено по нескольким броскам)."""
     import random

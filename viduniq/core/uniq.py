@@ -36,8 +36,8 @@ STRENGTH_LABELS = {
 STRENGTH_HINTS = {
     Strength.OFF: "Применяются только заданные вручную zoom, скорость и фильтры.",
     Strength.SOFT: "Почти незаметно: zoom 1–4%, скорость ±2%, поворот до 0.4°, обрезка 0.1–0.4 с, цвет ±2–3%, тон звука ±1%.",
-    Strength.MEDIUM: "Малозаметно: zoom 3–8%, скорость ±4%, поворот до 1°, обрезка до 0.8 с, цвет ±4–6%, лёгкий шум, fps, тон ±2%.",
-    Strength.STRONG: "Заметно при сравнении: zoom 5–12%, скорость ±7%, поворот до 2°, обрезка до 1.5 с, цвет ±8–10%, шум, виньетка, тон ±3%.",
+    Strength.MEDIUM: "Малозаметно: zoom 3–8%, скорость ±4%, поворот до 1°, обрезка до 0.8 с, цвет ±4–6%, лёгкий шум, тон звука ±2%. Частота кадров не понижается.",
+    Strength.STRONG: "Заметно при сравнении: zoom 5–12%, скорость ±7%, поворот до 2°, обрезка до 1.5 с, цвет ±8–10%, шум, виньетка, тон звука ±3%. Частота кадров не понижается.",
 }
 
 # Диапазоны для каждого режима. Все значения выбираются случайно для каждого файла.
@@ -45,22 +45,39 @@ PROFILES: dict[Strength, dict] = {
     Strength.SOFT: dict(
         zoom=(101, 104), speed=(98, 102), rotate=(0.0, 0.4), trim=(0.1, 0.4),
         bright=(-0.02, 0.02), contrast=(0.97, 1.03), sat=(0.97, 1.03), gamma=(0.97, 1.03), hue=(-1.5, 1.5),
-        noise=(0, 3), vignette=(0.0, 0.0), sharpen=(0.0, 0.2), fps=None,
+        noise=(0, 3), vignette=(0.0, 0.0), sharpen=(0.0, 0.2), fps=False,
         pitch=(0.99, 1.01), gain=(-1.0, 1.0), eq=(-1.0, 1.0), crf=(22, 25), gop=(48, 120),
     ),
     Strength.MEDIUM: dict(
         zoom=(103, 108), speed=(96, 104), rotate=(0.3, 1.0), trim=(0.3, 0.8),
         bright=(-0.04, 0.04), contrast=(0.95, 1.05), sat=(0.94, 1.06), gamma=(0.95, 1.05), hue=(-3.0, 3.0),
-        noise=(3, 7), vignette=(0.0, 0.15), sharpen=(0.1, 0.4), fps=[24.0, 25.0, 29.97, 30.0],
+        noise=(3, 7), vignette=(0.0, 0.15), sharpen=(0.1, 0.4), fps=True,
         pitch=(0.98, 1.02), gain=(-2.0, 2.0), eq=(-2.0, 2.0), crf=(21, 26), gop=(48, 150),
     ),
     Strength.STRONG: dict(
         zoom=(105, 112), speed=(93, 107), rotate=(0.8, 2.0), trim=(0.5, 1.5),
         bright=(-0.06, 0.06), contrast=(0.92, 1.08), sat=(0.90, 1.10), gamma=(0.93, 1.07), hue=(-5.0, 5.0),
-        noise=(6, 12), vignette=(0.1, 0.3), sharpen=(0.2, 0.6), fps=[24.0, 25.0, 29.97, 30.0],
+        noise=(6, 12), vignette=(0.1, 0.3), sharpen=(0.2, 0.6), fps=True,
         pitch=(0.97, 1.03), gain=(-3.0, 3.0), eq=(-3.0, 3.0), crf=(20, 27), gop=(40, 150),
     ),
 }
+
+# Стандартные частоты кадров. Понижать частоту нельзя — это видно глазу,
+# поэтому кандидаты берутся только не ниже исходной и не выше +25%.
+STANDARD_FPS = [24.0, 25.0, 29.97, 30.0, 48.0, 50.0, 59.94, 60.0]
+FPS_CHANGE_CHANCE = 0.4
+
+
+def pick_fps(source_fps: float, rng: random.Random, allowed: bool = True) -> Optional[float]:
+    """Новая частота кадров или None — «оставить как в исходнике»."""
+    if not allowed or source_fps <= 0:
+        return None
+    candidates = [f for f in STANDARD_FPS
+                  if f >= source_fps - 0.05 and f <= source_fps * 1.25 and abs(f - source_fps) > 0.05]
+    if not candidates or rng.random() > FPS_CHANGE_CHANCE:
+        return None
+    return rng.choice(candidates)
+
 
 # Правдоподобные значения тегов контейнера (ffmpeg сам пишет «Lavf/Lavc <версия>» — это его отпечаток).
 VIDEO_ENCODERS = [
@@ -135,10 +152,7 @@ def roll(strength: Strength, rng: random.Random, *, mirror_mode: str = "never", 
         return UniqParams(strength=strength, mirror=(mirror_mode == "always" or (mirror_mode == "random" and rng.random() < 0.5)),
                           metadata=random_metadata(rng))
     p = PROFILES[strength]
-    fps = None
-    if p["fps"]:
-        choices = [f for f in p["fps"] if abs(f - source_fps) > 0.5]
-        fps = rng.choice(choices) if choices and rng.random() < 0.7 else None
+    fps = pick_fps(source_fps, rng, bool(p["fps"]))
     return UniqParams(
         strength=strength,
         zoom=rng.randint(*p["zoom"]),

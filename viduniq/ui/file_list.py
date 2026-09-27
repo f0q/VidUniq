@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from ..core import ffmpeg as ff
 from ..core.constants import VALID_INPUT_EXTENSIONS
+from ..core.fmt import human_size
 from ..core.ffmpeg import MediaInfo
 
 log = logging.getLogger(__name__)
@@ -54,18 +55,14 @@ class FileEntry:
             parts.append(self.message.splitlines()[0][:60])
         elif self.status == DONE and self.out_path:
             parts.append("→ " + os.path.basename(self.out_path))
+            try:
+                parts.append(human_size(os.path.getsize(self.out_path)))
+            except OSError:
+                pass
             m = re.search(r"отличие \d+%", self.message or "")
             if m:
                 parts.append(m.group(0))
         return "  ·  ".join(parts)
-
-
-def human_size(n: int) -> str:
-    for unit in ("Б", "КБ", "МБ", "ГБ"):
-        if n < 1024:
-            return f"{n:.0f} {unit}"
-        n /= 1024
-    return f"{n:.1f} ТБ"
 
 
 def is_supported_input(path: str) -> bool:

@@ -18,6 +18,7 @@ from aiogram.types import CallbackQuery, FSInputFile, Message, TelegramObject
 from .. import __version__
 from ..core import ffmpeg as ff
 from ..core.constants import OVERLAY_EXTENSIONS, VALID_INPUT_EXTENSIONS
+from ..core.fmt import duration_text, human_size, size_delta
 from ..core.uniq import Strength
 from . import keyboards as kb
 from .access import AccessStore
@@ -292,6 +293,7 @@ def build_router(ctx: Ctx) -> Router:
         task.src_path = os.path.join(ctx.cfg.tmp_dir, f"{task.id}_in{ext}")
         try:
             await fetch_file(bot, ctx.cfg, file_obj.file_id, task.src_path)
+            task.src_size = os.path.getsize(task.src_path)
         except Exception as e:  # noqa: BLE001
             log.exception("download failed")
             await _edit(status, f"❌ Не удалось скачать файл: {html.escape(str(e))[:300]}")
@@ -460,13 +462,14 @@ def build_router(ctx: Ctx) -> Router:
             return
         await _edit_status(task, f"📤 <b>{name}</b>\nОтправляю результат…", None, force=True)
         sent = 0
+        total = len(task.outputs)
         for i, out in enumerate(task.outputs, 1):
             try:
                 info = ff.probe(out)
             except Exception:  # noqa: BLE001
                 info = ff.MediaInfo()
-            desc = task.applied[i - 1] if i - 1 < len(task.applied) else task.prefs.preset.label
-            cap = ("✅ " + (f"Вариант {i}/{len(task.outputs)}\n" if len(task.outputs) > 1 else "") + html.escape(desc))[:1000]
+            res = task.results[i - 1] if i - 1 < len(task.results) else None
+            cap = _report(task, res, info, out, i, total)
             fname = os.path.basename(out)
             try:
                 await bot.send_video(
@@ -481,7 +484,34 @@ def build_router(ctx: Ctx) -> Router:
                 await bot.send_message(task.chat_id, f"❌ Не удалось отправить {html.escape(fname)}: {html.escape(str(e))[:300]}")
         elapsed = time.time() - task.started_at
         ctx.access.touch(task.user_id, files=1)
-        await _edit_status(task, f"✅ <b>{name}</b>\nГотово: {sent} из {len(task.outputs)} · {elapsed:.0f} с", None, force=True)
+        await _edit_status(task, f"✅ <b>{name}</b>\nГотово: {sent} из {total} · {elapsed:.0f} с · "
+                                 f"{human_size(task.src_size)} → {human_size(sum(_size(o) for o in task.outputs))}",
+                           None, force=True)
+
+    def _report(task: Task, res, info: ff.MediaInfo, out: str, i: int, total: int) -> str:
+        """Отчёт под готовым видео: формат, разрешение, fps, длительность, размер, параметры."""
+        head = f"✅ <b>Вариант {i}/{total}</b>" if total > 1 else "✅ <b>Готово</b>"
+        tech = [task.prefs.preset.label]
+        if info.width:
+            tech.append(f"{info.width}×{info.height}")
+        if info.fps:
+            tech.append(f"{info.fps:.4g} fps")
+        if info.duration:
+            tech.append(duration_text(info.duration))
+        size_out = getattr(res, "size_out", 0) or _size(out)
+        size_in = getattr(res, "size_in", 0) or task.src_size
+        lines = [head, "📐 " + " · ".join(tech), "📦 " + size_delta(size_in, size_out)]
+        if res is not None:
+            lines.append("🎲 " + html.escape(res.summary))
+        elif i - 1 < len(task.applied):
+            lines.append("🎲 " + html.escape(task.applied[i - 1]))
+        return "\n".join(lines)[:1000]
+
+    def _size(path: str) -> int:
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return 0
 
     async def _edit_status(task: Task, text: str, markup, force: bool = False):
         if not task.status_msg_id or ctx.bot is None:

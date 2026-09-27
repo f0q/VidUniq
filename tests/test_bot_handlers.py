@@ -2,6 +2,7 @@
 import asyncio
 import datetime as dt
 import os
+import re
 import subprocess
 
 import pytest
@@ -160,8 +161,11 @@ async def test_video_end_to_end(env, tmp_path):
     await ctx.queue.stop()
     videos = _texts(session, SendVideo)
     assert len(videos) == 2 and videos[0].width == 1280 and videos[0].height == 720
-    assert "Вариант 1/2" in videos[0].caption and "Telegram Post" in videos[0].caption
-    assert "режим: средняя" in videos[0].caption and "отличие" in videos[0].caption
+    cap = videos[0].caption
+    assert "Вариант 1/2" in cap and "Telegram Post" in cap
+    assert "режим: средняя" in cap and "отличие" in cap
+    assert "1280×720" in cap and "fps" in cap                     # технические данные результата
+    assert re.search(r"📦 [\d.]+ (КБ|МБ) \(было [\d.]+ (КБ|МБ), [+−]\d+%\)", cap), cap
     edits = _texts(session, EditMessageText)
     assert any("✅" in e.text and "Готово: 2 из 2" in e.text for e in edits)
     assert not os.listdir(ctx.cfg.tmp_dir)           # всё убрано

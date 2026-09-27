@@ -22,6 +22,8 @@ class ProcessResult:
     out_path: str
     params: Optional[UniqParams] = None     # что применилось (None — ручной режим без метаданных)
     difference: Optional[float] = None      # 0..1, отличие от оригинала по кадрам
+    size_in: int = 0                        # байт, исходник
+    size_out: int = 0                       # байт, результат
 
     @property
     def summary(self) -> str:
@@ -118,4 +120,12 @@ def process_file(
     if measure and not (cancel and cancel.is_set()):
         from .similarity import difference
         diff = difference(src, out_path, ffmpeg_bin=ffmpeg_bin)
-    return ProcessResult(out_path=out_path, params=job.uniq, difference=diff)
+
+    def _size(path: str) -> int:
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return 0
+
+    return ProcessResult(out_path=out_path, params=job.uniq, difference=diff,
+                         size_in=_size(src), size_out=_size(out_path))

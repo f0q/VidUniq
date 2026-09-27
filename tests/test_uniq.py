@@ -26,6 +26,27 @@ def test_roll_deterministic_and_within_profile():
             assert "creation_time" in p.metadata and "v:encoder" in p.metadata
 
 
+def test_fps_never_drops_below_source():
+    from viduniq.core.uniq import pick_fps
+    for src in (23.98, 24, 25, 29.97, 30, 50, 60, 120):
+        for seed in range(60):
+            f = pick_fps(src, random.Random(seed))
+            assert f is None or f >= src - 0.05, (src, f)
+            assert f is None or f <= src * 1.25
+    assert pick_fps(30, random.Random(1), allowed=False) is None
+    assert pick_fps(0, random.Random(1)) is None
+    # у 30 fps подходящих кандидатов нет — частота остаётся исходной
+    assert {pick_fps(30, random.Random(i)) for i in range(50)} == {None}
+    assert {pick_fps(24, random.Random(i)) for i in range(200)} - {None}
+
+
+def test_roll_keeps_high_fps():
+    for seed in range(50):
+        assert roll(Strength.STRONG, random.Random(seed), source_fps=60.0).fps is None
+        f = roll(Strength.MEDIUM, random.Random(seed), source_fps=24.0).fps
+        assert f is None or f >= 24
+
+
 def test_profiles_are_monotonic():
     for key in ("zoom", "rotate", "trim", "noise"):
         assert PROFILES[Strength.SOFT][key][1] <= PROFILES[Strength.MEDIUM][key][1] <= PROFILES[Strength.STRONG][key][1]

@@ -26,6 +26,7 @@ class Task:
     src_path: str
     src_name: str
     prefs: UserPrefs
+    src_size: int = 0
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
     status_msg_id: Optional[int] = None
     cancel: threading.Event = field(default_factory=threading.Event)
@@ -33,6 +34,7 @@ class Task:
     variant: int = 0               # текущий вариант (1-based) во время работы
     outputs: list[str] = field(default_factory=list)
     applied: list[str] = field(default_factory=list)   # описание параметров каждого варианта
+    results: list = field(default_factory=list)        # ProcessResult каждого варианта
     error: Optional[str] = None
     started_at: float = 0.0
     done_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -181,6 +183,7 @@ class ProcessingQueue:
             try:
                 res = fut.result()
                 task.outputs.append(res.out_path)
+                task.results.append(res)
                 task.applied.append(f"{task.prefs.preset.label} · {res.summary}")
             except ff.Cancelled:
                 task.error = "Отменено"
