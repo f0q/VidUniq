@@ -110,6 +110,11 @@ async def test_callbacks_change_prefs(env):
     dp, bot, session, ctx = env
     await dp.feed_update(bot, _cb(ALLOWED, "u:strong"))
     await dp.feed_update(bot, _cb(ALLOWED, "t:mirror"))
+    await dp.feed_update(bot, _cb(ALLOWED, "tr"))
+    assert ctx.store.get(ALLOWED.id).trim_mode == "start"
+    await dp.feed_update(bot, _cb(ALLOWED, "tr"))
+    await dp.feed_update(bot, _cb(ALLOWED, "tr"))
+    assert ctx.store.get(ALLOWED.id).trim_mode == "end"
     assert ctx.store.get(ALLOWED.id).strength == "strong" and ctx.store.get(ALLOWED.id).mirror is True
     await dp.feed_update(bot, _cb(ALLOWED, "u:off"))
     session.calls.clear()

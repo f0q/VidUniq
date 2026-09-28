@@ -47,10 +47,12 @@ Platforms detect reposts by perceptual fingerprints of frames and audio, not by 
 
 | Mode | What changes |
 |---|---|
-| **Soft** | zoom 1–4%, speed ±2%, rotation up to 0.4°, trim 0.1–0.4 s from the start, color/gamma ±2–3%, slight sharpening, audio pitch ±1%, volume ±1 dB |
-| **Medium** (default) | zoom 3–8%, speed ±4%, rotation up to 1°, trim up to 0.8 s, color ±4–6%, light noise, vignette, pitch ±2%, ±2 dB |
-| **Strong** | zoom 5–12%, speed ±7%, rotation up to 2°, trim up to 1.5 s, color ±8–10%, noise, vignette, sharpening, pitch ±3%, ±3 dB |
+| **Soft** | zoom 1–4%, speed ±2%, rotation up to 0.4°, trim 0.1–0.4 s (from the end by default), color/gamma ±2–3%, slight sharpening, audio pitch ±1%, volume ±1 dB |
+| **Medium** (default) | zoom 3–8%, speed ±4%, rotation up to 1°, trim up to 0.8 s (from the end), color ±4–6%, light noise, vignette, pitch ±2%, ±2 dB |
+| **Strong** | zoom 5–12%, speed ±7%, rotation up to 2°, trim up to 1.5 s (from the end), color ±8–10%, noise, vignette, sharpening, pitch ±3%, ±3 dB |
 | Off (manual) | only the zoom, speed and filters you set by hand |
+
+By default the **end** is trimmed — the first seconds (the hook) stay intact; the settings also offer "don't trim" and "start".
 
 **Output frame rate always matches the source** (it may go up to the nearest standard rate, never down — the speed change is compensated too).
 

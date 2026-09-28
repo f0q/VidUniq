@@ -1,4 +1,5 @@
 import random
+from dataclasses import replace
 
 from viduniq.core import ffmpeg as ff
 from viduniq.core.batch import prepare_job
@@ -18,7 +19,7 @@ def test_roll_deterministic_and_within_profile():
             assert prof["zoom"][0] <= p.zoom <= prof["zoom"][1]
             assert prof["speed"][0] <= p.speed <= prof["speed"][1]
             assert prof["rotate"][0] <= abs(p.rotate_deg) <= prof["rotate"][1] + 1e-9
-            assert prof["trim"][0] <= p.trim_start <= prof["trim"][1] + 1e-9
+            assert p.trim_start == 0.0 and prof["trim"][0] <= p.trim_end <= prof["trim"][1] + 1e-9
             assert prof["contrast"][0] - 1e-9 <= p.contrast <= prof["contrast"][1] + 1e-9
             assert prof["pitch"][0] - 1e-9 <= p.audio_pitch <= prof["pitch"][1] + 1e-9
             assert prof["crf"][0] <= p.crf <= prof["crf"][1]
@@ -50,6 +51,38 @@ def test_roll_keeps_high_fps():
 def test_profiles_are_monotonic():
     for key in ("zoom", "rotate", "trim", "noise"):
         assert PROFILES[Strength.SOFT][key][1] <= PROFILES[Strength.MEDIUM][key][1] <= PROFILES[Strength.STRONG][key][1]
+
+
+def test_trim_modes():
+    rng = random.Random(1)
+    end = roll(Strength.MEDIUM, random.Random(1), trim_mode="end")
+    start = roll(Strength.MEDIUM, random.Random(1), trim_mode="start")
+    off = roll(Strength.MEDIUM, random.Random(1), trim_mode="off")
+    assert end.trim_end > 0 and end.trim_start == 0
+    assert start.trim_start > 0 and start.trim_end == 0
+    assert off.trim_start == 0 and off.trim_end == 0
+    assert "обрезка конца" in describe(end) and "обрезка начала" in describe(start)
+
+
+def test_trim_applied_as_input_options():
+    info = _info(duration=10.0)
+    job = ff.JobSettings(OUTPUT_PRESETS[0], strength=Strength.MEDIUM, trim_mode="end")
+    job = prepare_job(job, None, None, random.Random(3), info)
+    cmd = ff.build_command("ffmpeg", "in.mp4", "o.mp4", info, job)
+    i = cmd.index("-i")
+    assert "-ss" not in cmd and cmd[i - 2] == "-t"                       # начало не трогаем
+    assert abs(float(cmd[i - 1]) - (10.0 - job.uniq.trim_end)) < 0.01
+    job = replace(job, uniq=None, trim_mode="start")
+    job = prepare_job(job, None, None, random.Random(3), info)
+    cmd = ff.build_command("ffmpeg", "in.mp4", "o.mp4", info, job)
+    assert cmd[cmd.index("-i") - 2] == "-ss"
+    # короткий ролик не режем вовсе
+    short = _info(duration=1.2)
+    job = prepare_job(ff.JobSettings(OUTPUT_PRESETS[0], strength=Strength.STRONG, trim_mode="end"),
+                      None, None, random.Random(3), short)
+    cmd = ff.build_command("ffmpeg", "in.mp4", "o.mp4", short, job)
+    assert "-t" not in cmd and "-ss" not in cmd
+    assert abs(ff.expected_duration(short, job) - 1.2 / (job.uniq.speed / 100)) < 1e-6
 
 
 def test_roll_options():
@@ -112,7 +145,7 @@ def test_build_command_with_uniq():
     assert u is not None and u.strength == Strength.MEDIUM
     cmd = ff.build_command("ffmpeg", "in.mp4", "o.mp4", _info(), job)
     fc = cmd[cmd.index("-filter_complex") + 1]
-    assert cmd[cmd.index("-i") - 2:cmd.index("-i")] == ["-ss", f"{u.trim_start:.2f}"]
+    assert cmd[cmd.index("-i") - 2:cmd.index("-i")] == ["-t", f"{10.0 - u.trim_end:.2f}"]
     assert f"trunc(iw*{u.zoom / 100:.4f}/2)*2" in fc              # zoom из режима, а не ручной 150
     assert f"setpts=PTS/{u.speed / 100:.4f}" in fc
     assert "rotate=" in fc and "[unq]" in fc
@@ -121,7 +154,7 @@ def test_build_command_with_uniq():
     assert "-map_metadata" in cmd and f"creation_time={u.metadata['creation_time']}" in cmd
     assert cmd[cmd.index("-metadata:s:v:0") + 1] == f"handler_name={u.metadata['v:handler_name']}"
     assert cmd[cmd.index("-brand") + 1] == u.metadata["brand"] and "+bitexact" in cmd
-    assert abs(ff.expected_duration(_info(), job) - (10 - u.trim_start) / (u.speed / 100)) < 1e-6
+    assert abs(ff.expected_duration(_info(), job) - (10 - u.trim_end) / (u.speed / 100)) < 1e-6
 
 
 def test_manual_mode_keeps_ranges_and_swaps_metadata():
@@ -142,4 +175,4 @@ def test_mirror_and_no_trim_for_short_clip():
     job = prepare_job(job, None, None, random.Random(4), _info(duration=1.0))
     cmd = ff.build_command("ffmpeg", "in.mp4", "o.mp4", _info(duration=1.0), job)
     assert "hflip" in cmd[cmd.index("-filter_complex") + 1]
-    assert "-ss" not in cmd
+    assert "-ss" not in cmd and "-t" not in cmd

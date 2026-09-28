@@ -132,7 +132,7 @@ def test_uniq_modes_end_to_end(samples, tmp_path, strength):
     u = res.params
     out = ff.probe(res.out_path)
     assert (out.width, out.height) == (1080, 1920) and out.has_audio
-    expected = (4 - u.trim_start) / (u.speed / 100)
+    expected = (4 - u.trim_start - u.trim_end) / (u.speed / 100)
     assert abs(out.duration - expected) < 0.35, (out.duration, expected, u)
     raw = _probe_raw(res.out_path)
     tags = raw["format"].get("tags", {})

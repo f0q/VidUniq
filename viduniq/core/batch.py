@@ -64,7 +64,7 @@ def prepare_job(job: JobSettings, zoom_range: Range, speed_range: Range, rng: ra
         return job
     if job.strength != Strength.OFF:
         params = roll(job.strength, rng, mirror_mode=job.mirror_mode, touch_audio=job.touch_audio,
-                      source_fps=info.fps if info else 30.0)
+                      source_fps=info.fps if info else 30.0, trim_mode=job.trim_mode)
         return replace(job, uniq=params)
     job = replace(job, zoom=pick(job.zoom, zoom_range, rng), speed=pick(job.speed, speed_range, rng))
     if job.strip_metadata or job.mirror_mode != "never":

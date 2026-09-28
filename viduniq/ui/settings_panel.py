@@ -16,7 +16,7 @@ from ..core.constants import (
     FILTERS, OUTPUT_PRESETS, OVERLAY_EXTENSIONS, OVERLAY_POSITIONS, SPEED_RANGE, ZOOM_RANGE,
 )
 from ..core.ffmpeg import JobSettings
-from ..core.uniq import STRENGTH_HINTS, Strength
+from ..core.uniq import STRENGTH_HINTS, TRIM_LABELS, TRIM_MODES, Strength
 from ..core.worker import BatchSettings
 
 
@@ -131,6 +131,16 @@ class SettingsPanel(QScrollArea):
         self.strength_hint.setWordWrap(True)
         self.strength_hint.setStyleSheet("color: palette(placeholder-text);")
         v.addWidget(self.strength_hint)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Обрезать:"))
+        self.trim = QComboBox()
+        for m in TRIM_MODES:
+            self.trim.addItem(TRIM_LABELS[m], m)
+        self.trim.setCurrentIndex(TRIM_MODES.index("end"))
+        self.trim.setToolTip("Короткий кусок, который отрезается для уникальности.\n"
+                             "«Конец» не трогает первые секунды — важно для Reels и Shorts.")
+        row.addWidget(self.trim, 1)
+        v.addLayout(row)
         self.mirror = QCheckBox("Зеркалить по горизонтали (случайно, 50/50)")
         self.mirror.setToolTip("Сильно меняет отпечаток кадра, но текст в кадре будет отражён")
         self.touch_audio = QCheckBox("Слегка менять звук (тон и громкость ±1–3%)")
@@ -261,6 +271,7 @@ class SettingsPanel(QScrollArea):
         st = self.current_strength()
         self.strength_hint.setText(STRENGTH_HINTS[st])
         manual = st == Strength.OFF
+        self.trim.setEnabled(not manual)
         self.frame_group.setEnabled(manual)
         self.frame_group.setTitle("Изменения кадра (ручной режим)" if manual else "Изменения кадра — задаются режимом")
         self.touch_audio.setEnabled(not manual)
@@ -314,6 +325,7 @@ class SettingsPanel(QScrollArea):
             hw_encode=self.hw.isChecked() and self.hw.isEnabled(),
             strength=self.current_strength(),
             mirror_mode="random" if self.mirror.isChecked() else "never",
+            trim_mode=self.trim.currentData(),
             touch_audio=self.touch_audio.isChecked(),
         )
         out_dir = self.out_dir.text().strip() if self.out_custom.isChecked() else None
@@ -323,6 +335,7 @@ class SettingsPanel(QScrollArea):
     def save(self, s: QSettings):
         s.setValue("strength", self.current_strength().value)
         s.setValue("mirror", self.mirror.isChecked())
+        s.setValue("trim_mode", self.trim.currentData())
         s.setValue("touch_audio", self.touch_audio.isChecked())
         s.setValue("preset", self.preset.currentIndex())
         s.setValue("blur_bg", self.blur_bg.isChecked())
@@ -345,6 +358,7 @@ class SettingsPanel(QScrollArea):
         st = Strength.parse(s.value("strength", "medium"))
         self.strength.setCurrentIndex(max(0, self.strength.findData(st.value)))
         self.mirror.setChecked(b("mirror", False))
+        self.trim.setCurrentIndex(max(0, self.trim.findData(str(s.value("trim_mode", "end")))))
         self.touch_audio.setChecked(b("touch_audio", True))
         self.preset.setCurrentIndex(int(s.value("preset", 0)))
         self.blur_bg.setChecked(b("blur_bg", False))

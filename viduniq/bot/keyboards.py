@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..core.constants import FILTERS, OUTPUT_PRESETS, OVERLAY_POSITIONS
-from ..core.uniq import STRENGTH_HINTS, Strength
+from ..core.uniq import STRENGTH_HINTS, TRIM_LABELS, TRIM_MODES, Strength
 from .store import SPEED_CHOICES, ZOOM_CHOICES, UserPrefs
 
 FILTER_NAMES = list(FILTERS)
@@ -42,6 +42,8 @@ def strength_menu(p: UserPrefs) -> InlineKeyboardMarkup:
     for st in STRENGTH_ORDER:
         mark = "✅ " if st == p.strength_enum else ""
         b.row(_btn(f"{mark}{st.label}", f"u:{st.value}"))
+    if p.strength_enum != Strength.OFF:
+        b.row(_btn(f"✂️ Обрезать: {TRIM_LABELS.get(p.trim_mode, 'конец')}", "tr"))
     b.row(_btn(f"{'✅' if p.mirror else '☐'} Зеркалить (случайно 50/50)", "t:mirror"))
     if p.strength_enum != Strength.OFF:
         b.row(_btn(f"{'✅' if p.touch_audio else '☐'} Слегка менять звук (тон/громкость)", "t:audio"))
@@ -51,7 +53,12 @@ def strength_menu(p: UserPrefs) -> InlineKeyboardMarkup:
 
 def strength_text(p: UserPrefs) -> str:
     st = p.strength_enum
-    return f"🎲 <b>Уникализация: {st.label}</b>\n\n{STRENGTH_HINTS[st]}\n\nКаждый файл получает свой случайный набор значений."
+    trim = TRIM_LABELS.get(p.trim_mode, "конец")
+    tail = "" if st == Strength.OFF else (
+        f"\n\n✂️ Обрезка: <b>{trim}</b>" +
+        ("" if p.trim_mode != "start" else " — первые секунды будут отрезаны, для Reels лучше «конец»"))
+    return (f"🎲 <b>Уникализация: {st.label}</b>\n\n{STRENGTH_HINTS[st]}"
+            f"{tail}\n\nКаждый файл получает свой случайный набор значений.")
 
 
 def presets_menu(p: UserPrefs, page: int) -> InlineKeyboardMarkup:

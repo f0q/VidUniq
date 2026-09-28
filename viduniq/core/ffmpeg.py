@@ -168,6 +168,7 @@ class JobSettings:
     # Уникализация: режим и его опции; `uniq` — конкретные значения для файла (заполняет process_file)
     strength: Strength = Strength.OFF
     mirror_mode: str = "never"          # never | random | always
+    trim_mode: str = "end"              # off | end | start — откуда отрезать кусок
     touch_audio: bool = True
     uniq: Optional[UniqParams] = None
 
@@ -234,8 +235,11 @@ def build_command(
 
     # --- входы ---
     inputs = 0
-    if u and u.trim_start > 0 and info.duration > u.trim_start + 1.0:
-        cmd += ["-ss", f"{u.trim_start:.2f}"]
+    trim_start, keep = effective_trim(info, s)
+    if trim_start > 0:
+        cmd += ["-ss", f"{trim_start:.2f}"]
+    if keep is not None:
+        cmd += ["-t", f"{keep:.2f}"]
     cmd += ["-i", in_path]
     video_in = f"[{inputs}:v]"
     inputs += 1
@@ -391,12 +395,23 @@ def build_command(
     return cmd
 
 
+def effective_trim(info: MediaInfo, s: JobSettings) -> tuple[float, Optional[float]]:
+    """(сколько отрезать в начале, сколько секунд читать). Короткие ролики не режем."""
+    u = s.uniq
+    if not u or info.duration <= 0:
+        return 0.0, None
+    start, end = max(0.0, u.trim_start), max(0.0, u.trim_end)
+    keep = info.duration - start - end
+    if keep < 1.0:                      # слишком короткий ролик — оставляем как есть
+        return 0.0, None
+    return start, (keep if end > 0 else None)
+
+
 def expected_duration(info: MediaInfo, s: JobSettings) -> float:
     u = s.uniq
     speed = u.speed if u and u.strength != Strength.OFF else s.speed
-    dur = info.duration
-    if u and u.trim_start > 0 and dur > u.trim_start + 1.0:
-        dur -= u.trim_start
+    start, keep = effective_trim(info, s)
+    dur = keep if keep is not None else max(0.0, info.duration - start)
     sp = speed / 100.0
     return dur / sp if sp > 0 else dur
 

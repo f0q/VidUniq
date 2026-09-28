@@ -19,7 +19,7 @@ from .. import __version__
 from ..core import ffmpeg as ff
 from ..core.constants import OVERLAY_EXTENSIONS, VALID_INPUT_EXTENSIONS
 from ..core.fmt import duration_text, human_size, size_delta
-from ..core.uniq import Strength
+from ..core.uniq import TRIM_MODES, Strength
 from . import keyboards as kb
 from .access import AccessStore
 from .config import Config
@@ -366,6 +366,10 @@ def build_router(ctx: Ctx) -> Router:
             text, markup = kb.strength_text(p), kb.strength_menu(p)
         elif key == "u":
             p = replace(p, strength=Strength.parse(parts[1]).value)
+            text, markup = kb.strength_text(p), kb.strength_menu(p)
+        elif key == "tr":
+            cur = p.trim_mode if p.trim_mode in TRIM_MODES else "end"
+            p = replace(p, trim_mode=TRIM_MODES[(TRIM_MODES.index(cur) + 1) % len(TRIM_MODES)])
             text, markup = kb.strength_text(p), kb.strength_menu(p)
         elif key == "pp":
             text, markup = "📐 <b>Формат вывода</b>", kb.presets_menu(p, int(parts[1]))

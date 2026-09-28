@@ -35,9 +35,9 @@ STRENGTH_LABELS = {
 
 STRENGTH_HINTS = {
     Strength.OFF: "Применяются только заданные вручную zoom, скорость и фильтры.",
-    Strength.SOFT: "Почти незаметно: zoom 1–4%, скорость ±2%, поворот до 0.4°, обрезка 0.1–0.4 с, цвет ±2–3%, тон звука ±1%.",
-    Strength.MEDIUM: "Малозаметно: zoom 3–8%, скорость ±4%, поворот до 1°, обрезка до 0.8 с, цвет ±4–6%, лёгкий шум, тон звука ±2%. Частота кадров не понижается.",
-    Strength.STRONG: "Заметно при сравнении: zoom 5–12%, скорость ±7%, поворот до 2°, обрезка до 1.5 с, цвет ±8–10%, шум, виньетка, тон звука ±3%. Частота кадров не понижается.",
+    Strength.SOFT: "Почти незаметно: zoom 1–4%, скорость ±2%, поворот до 0.4°, обрезка 0.1–0.4 с (по умолчанию с конца), цвет ±2–3%, тон звука ±1%.",
+    Strength.MEDIUM: "Малозаметно: zoom 3–8%, скорость ±4%, поворот до 1°, обрезка до 0.8 с (по умолчанию с конца), цвет ±4–6%, лёгкий шум, тон звука ±2%. Частота кадров не понижается.",
+    Strength.STRONG: "Заметно при сравнении: zoom 5–12%, скорость ±7%, поворот до 2°, обрезка до 1.5 с (по умолчанию с конца), цвет ±8–10%, шум, виньетка, тон звука ±3%. Частота кадров не понижается.",
 }
 
 # Диапазоны для каждого режима. Все значения выбираются случайно для каждого файла.
@@ -104,6 +104,7 @@ class UniqParams:
     speed: int = 100
     rotate_deg: float = 0.0
     trim_start: float = 0.0
+    trim_end: float = 0.0
     brightness: float = 0.0
     contrast: float = 1.0
     saturation: float = 1.0
@@ -145,8 +146,12 @@ def random_metadata(rng: random.Random, now: Optional[dt.datetime] = None) -> di
     }
 
 
+TRIM_MODES = ("off", "end", "start")
+TRIM_LABELS = {"off": "не обрезать", "end": "конец", "start": "начало"}
+
+
 def roll(strength: Strength, rng: random.Random, *, mirror_mode: str = "never", touch_audio: bool = True,
-         source_fps: float = 30.0) -> UniqParams:
+         source_fps: float = 30.0, trim_mode: str = "end") -> UniqParams:
     """Бросает кубики по профилю режима."""
     if strength == Strength.OFF:
         return UniqParams(strength=strength, mirror=(mirror_mode == "always" or (mirror_mode == "random" and rng.random() < 0.5)),
@@ -158,7 +163,8 @@ def roll(strength: Strength, rng: random.Random, *, mirror_mode: str = "never", 
         zoom=rng.randint(*p["zoom"]),
         speed=rng.randint(*p["speed"]),
         rotate_deg=round(_signed(rng, *p["rotate"]), 2),
-        trim_start=round(_u(rng, *p["trim"]), 2),
+        trim_start=round(_u(rng, *p["trim"]), 2) if trim_mode == "start" else 0.0,
+        trim_end=round(_u(rng, *p["trim"]), 2) if trim_mode == "end" else 0.0,
         brightness=round(_u(rng, *p["bright"]), 3),
         contrast=round(_u(rng, *p["contrast"]), 3),
         saturation=round(_u(rng, *p["sat"]), 3),
@@ -245,7 +251,9 @@ def describe(p: UniqParams) -> str:
     if abs(p.rotate_deg) > 1e-3:
         parts.append(f"поворот {p.rotate_deg:+.2f}°")
     if p.trim_start > 0:
-        parts.append(f"обрезка {p.trim_start:.1f} с")
+        parts.append(f"обрезка начала {p.trim_start:.1f} с")
+    if p.trim_end > 0:
+        parts.append(f"обрезка конца {p.trim_end:.1f} с")
     color = []
     if abs(p.brightness) > 1e-4:
         color.append(f"яркость {p.brightness * 100:+.0f}%")

@@ -11,6 +11,7 @@ def test_defaults_to_job():
     assert j.preset.is_original and j.blur_background is False and j.hw_encode is False
     assert j.strip_metadata is True and j.mute_audio is False
     assert j.strength == Strength.MEDIUM and j.mirror_mode == "never" and j.touch_audio is True
+    assert j.trim_mode == "end" and UserPrefs(trim_mode="junk").to_job().trim_mode == "end"
     assert UserPrefs(strength="strong", mirror=True).to_job().mirror_mode == "random"
     assert UserPrefs(strength="bogus").strength_enum == Strength.MEDIUM
 
